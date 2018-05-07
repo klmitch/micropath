@@ -71,4 +71,4 @@ class TestController(object):
         obj = controller.Controller()
 
         with pytest.raises(NotImplementedError):
-            obj.construct('other')
+            obj.construct('other', {})

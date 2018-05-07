@@ -895,7 +895,7 @@ class TestElement(object):
         assert result.element == obj
         assert obj.methods == {}
         assert obj._delegation == result
-        mock_init.assert_called_once_with('delegation')
+        mock_init.assert_called_once_with('delegation', {})
         mock_Method.assert_not_called()
 
     def test_mount_with_methods(self, mocker):
@@ -913,7 +913,7 @@ class TestElement(object):
         )
         obj = ElementForTest('ident')
 
-        result = obj.mount('delegation', 'get', 'put')
+        result = obj.mount('delegation', 'get', 'put', a=1, b=2)
 
         assert isinstance(result, elements.Delegation)
         assert result.element == obj
@@ -921,7 +921,7 @@ class TestElement(object):
         for meth in methods.values():
             assert meth._delegation == result
         assert obj._delegation is None
-        mock_init.assert_called_once_with('delegation')
+        mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
         mock_Method.assert_has_calls([
             mocker.call('get', None, parent=obj),
             mocker.call('put', None, parent=obj),
@@ -929,7 +929,7 @@ class TestElement(object):
         assert mock_Method.call_count == 2
 
     def test_mount_delegation(self, mocker):
-        delegation = elements.Delegation('delegation')
+        delegation = elements.Delegation('delegation', {})
         mock_init = mocker.patch.object(
             elements.Delegation, '__init__',
             return_value=None,
@@ -982,7 +982,7 @@ class TestElement(object):
             'mount.return_value': mocker.Mock(element=None),
         })
 
-        result = obj.mount('delegation', 'get', 'put')
+        result = obj.mount('delegation', 'get', 'put', a=1, b=2)
 
         assert result == obj._master.mount.return_value
         assert result.element is None
@@ -990,7 +990,11 @@ class TestElement(object):
         assert obj._delegation is None
         mock_init.assert_not_called()
         mock_Method.assert_not_called()
-        obj._master.mount.assert_called_once_with('delegation', 'get', 'put')
+        obj._master.mount.assert_called_once_with(
+            'delegation', 'get', 'put',
+            a=1,
+            b=2,
+        )
 
     def test_delegation_base(self):
         obj = ElementForTest('ident')
@@ -1593,15 +1597,16 @@ class TestBindingMap(object):
 
 class TestDelegation(object):
     def test_init(self):
-        result = elements.Delegation('controller')
+        result = elements.Delegation('controller', 'kwargs')
 
         assert result.controller == 'controller'
+        assert result.kwargs == 'kwargs'
         assert result.element is None
         assert result._cache == {}
 
     def test_dunder_get_class(self, mocker):
         mock_get = mocker.patch.object(elements.Delegation, 'get')
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
 
         result = obj.__get__(None, 'class')
 
@@ -1610,7 +1615,7 @@ class TestDelegation(object):
 
     def test_dunder_get_object(self, mocker):
         mock_get = mocker.patch.object(elements.Delegation, 'get')
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
 
         result = obj.__get__('object', 'class')
 
@@ -1619,7 +1624,7 @@ class TestDelegation(object):
 
     def test_set(self):
         target = object()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
 
         obj.__set__(target, 'value')
 
@@ -1627,7 +1632,7 @@ class TestDelegation(object):
 
     def test_delete_exists(self):
         target = object()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
         obj._cache = {id(target): 'value'}
 
         obj.__delete__(target)
@@ -1636,7 +1641,7 @@ class TestDelegation(object):
 
     def test_delete_missing(self):
         target = object()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
 
         obj.__delete__(target)
 
@@ -1645,7 +1650,7 @@ class TestDelegation(object):
     def test_get_cached(self, mocker):
         mock_construct = mocker.patch.object(elements.Delegation, 'construct')
         target = object()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
         obj._cache = {id(target): 'value'}
 
         result = obj.get(target)
@@ -1657,7 +1662,7 @@ class TestDelegation(object):
     def test_get_uncached(self, mocker):
         mock_construct = mocker.patch.object(elements.Delegation, 'construct')
         target = object()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', {})
 
         result = obj.get(target)
 
@@ -1667,12 +1672,12 @@ class TestDelegation(object):
 
     def test_construct(self, mocker):
         target = mocker.Mock()
-        obj = elements.Delegation('controller')
+        obj = elements.Delegation('controller', 'kwargs')
 
         result = obj.construct(target)
 
         assert result == target.construct.return_value
-        target.construct.assert_called_once_with('controller')
+        target.construct.assert_called_once_with('controller', 'kwargs')
 
 
 class TestPathFunc(object):

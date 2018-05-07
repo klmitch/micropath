@@ -79,7 +79,7 @@ class Controller(object):
     decorator for how to create the necessary routes.
     """
 
-    def construct(self, other):
+    def construct(self, other, kwargs):
         """
         Construct another controller.  This is called on objects which
         have other controller classes mounted on them, in order to
@@ -87,6 +87,8 @@ class Controller(object):
         this method if a controller is mounted.
 
         :param other: The other controller class to construct.
+        :param dict kwargs: Additional keyword arguments passed when
+                            setting up the mount point.
 
         :returns: An instance of the other controller class, properly
                   initialized.  Note that the default implementation

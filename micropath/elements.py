@@ -251,13 +251,17 @@ class Element(object):
 
         return decorator
 
-    def mount(self, delegation, *methods):
+    def mount(self, delegation, *methods, **kwargs):
         """
         Mount another controller class at this path element.  Only one
         delegation is allowed.  The delegation can be restricted to a
         set of HTTP methods by listing the method name strings after
         the controller class; the default is to delegate all HTTP
         methods to the other controller.
+
+        Additional keyword arguments will be passed when creating a
+        ``Delegation``, which will subsequently pass them to the
+        controller's ``construct()`` method.
 
         :param delegation: Another controller to delegate to.  This
                            may be a ``micropath.Controller`` class
@@ -275,7 +279,7 @@ class Element(object):
 
         # Delegate to the master
         if self._master:
-            return self._master.mount(delegation, *methods)
+            return self._master.mount(delegation, *methods, **kwargs)
 
         # Make sure the delegation hasn't already been set
         if self._delegation:
@@ -283,7 +287,7 @@ class Element(object):
 
         # Wrap the delegation, if necessary
         if not isinstance(delegation, Delegation):
-            delegation = Delegation(delegation)
+            delegation = Delegation(delegation, kwargs)
 
         # Save ourselves into the delegation so the controller
         # metaclass can do its thing
@@ -737,7 +741,7 @@ class Method(Element):
 
         raise ValueError('cannot attach a method to a method')
 
-    def mount(self, delegation):
+    def mount(self, delegation, **kwargs):
         """
         Mount another controller class at this path element.  Only one
         delegation is allowed.
@@ -757,7 +761,7 @@ class Method(Element):
         """
 
         # Method is overridden to ensure methods can't be added
-        return super(Method, self).mount(delegation)
+        return super(Method, self).mount(delegation, **kwargs)
 
 
 class MergingMap(collections.MutableMapping):
@@ -976,16 +980,19 @@ class Delegation(object):
     controller class passed to the constructor.
     """
 
-    def __init__(self, controller):
+    def __init__(self, controller, kwargs):
         """
         Initialize the ``Delegation`` instance.
 
         :param controller: A ``micropath.Controller`` class (not
                            instance) that will be delegated to.
+        :param dict kwargs: Additional keyword arguments passed when
+                            setting up the mount point.
         """
 
-        # Save the controller
+        # Save the controller and keyword arguments
         self.controller = controller
+        self.kwargs = kwargs
 
         # The element may need to be added to the controller's root
         self.element = None
@@ -1071,7 +1078,7 @@ class Delegation(object):
                   class passed to the constructor.
         """
 
-        return obj.construct(self.controller)
+        return obj.construct(self.controller, self.kwargs)
 
 
 def path(ident=None):
@@ -1185,4 +1192,6 @@ def mount(delegation, *methods, **kwargs):
     """
 
     # Construct a Path element and call its mount() method
-    return Path(kwargs.get('ident')).mount(delegation, *methods)
+    return Path(kwargs.pop('ident', None)).mount(
+        delegation, *methods, **kwargs
+    )
