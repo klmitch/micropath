@@ -1168,7 +1168,6 @@ class TestRoot(object):
 
         obj.add_elem(elem, 'spam')
 
-        print obj.paths._map
         assert obj.paths == {None: elem}
         assert obj.bindings == {}
         assert obj.methods == {}
