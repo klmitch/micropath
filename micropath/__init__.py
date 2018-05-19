@@ -14,9 +14,12 @@
 
 from micropath.controller import Controller
 from micropath.elements import path, bind, route, mount
+from micropath.injector import inject, wraps, call_wrapped, wants
 
 __all__ = [
     'Controller',
 
     'path', 'bind', 'route', 'mount',
+
+    'inject', 'wraps', 'call_wrapped', 'wants',
 ]
