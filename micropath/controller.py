@@ -255,7 +255,7 @@ class Controller(object):
                   application, as returned by the handler methods.  If
                   no handler method is available, an appropriate error
                   will be generated to indicate that the path doesn't
-                  exist (404) or the method is unacceptable (405).
+                  exist (404) or the method is unacceptable (501).
         """
 
         # Note: The contents of this method are mostly copied from the
@@ -265,12 +265,11 @@ class Controller(object):
         req = self.micropath_request(environ)
         req.response = req.ResponseClass()
 
-        # Next, walk the path tree and invoke the handler
-        try:
-            # Use the injector cleanup context manager to explicitly
-            # break reference loops after we've dispatched to the
-            # handler method
-            with req.injector.cleanup() as injector:
+        # Next, walk the path tree and invoke the handler; we use the
+        # injector cleanup context manager to explicitly break
+        # reference loops after we've dispatched to the handler method
+        with req.injector.cleanup() as injector:
+            try:
                 # Populate the request and root_controller fields of
                 # the injector
                 injector['request'] = req
@@ -290,19 +289,19 @@ class Controller(object):
                 self.micropath_prepare_injector(req, injector)
 
                 resp = self._micropath_dispatch(req, injector)
-        except webob.exc.HTTPException as exc:
-            resp = exc
-        except ValueError as exc:
-            # Some error occurred; we'll turn it into a bad request
-            # error.  This is here as a last resort; these exceptions
-            # should be caught and handled by _micropath_dispatch()
-            resp = self.micropath_bad_request(req, exc)
-        except Exception as exc:
-            # Some other error occurred; we'll turn it into an
-            # internal server error.  This is here as a last resort;
-            # these exceptions should be caught and handled by
-            # _micropath_dispatch()
-            resp = self.micropath_server_error(req, exc)
+            except webob.exc.HTTPException as exc:
+                resp = exc
+            except ValueError as exc:
+                # Some error occurred; we'll turn it into a bad request
+                # error.  This is here as a last resort; these exceptions
+                # should be caught and handled by _micropath_dispatch()
+                resp = self.micropath_bad_request(req, exc)
+            except Exception as exc:
+                # Some other error occurred; we'll turn it into an
+                # internal server error.  This is here as a last resort;
+                # these exceptions should be caught and handled by
+                # _micropath_dispatch()
+                resp = self.micropath_server_error(req, exc)
 
         # Use the default response if none was returned
         if resp is None:
@@ -568,9 +567,7 @@ class Controller(object):
         malformed.
 
         :param request: The request that caused the error to be
-                        raised.  Note that the contents of the
-                        ``injector`` attribute may have been discarded
-                        and should not be repopulated.
+                        raised.
         :param cause: The ``ValueError`` exception that caused this
                       method to be called.
 
@@ -590,9 +587,7 @@ class Controller(object):
         request processing.
 
         :param request: The request that caused the error to be
-                        raised.  Note that the contents of the
-                        ``injector`` attribute may have been discarded
-                        and should not be repopulated.
+                        raised.
         :param cause: The exception that caused this method to be
                       called.
 
