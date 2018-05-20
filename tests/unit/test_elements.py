@@ -825,6 +825,7 @@ class TestElement(object):
         mock_Method.assert_called_once_with(None, func, parent=obj)
         assert obj.methods == {None: mock_Method.return_value}
         assert func._micropath_handler is True
+        assert func._micropath_elem is obj
 
     def test_route_no_methods(self, mocker):
         mock_Method = mocker.patch.object(
@@ -847,6 +848,7 @@ class TestElement(object):
         mock_Method.assert_called_once_with(None, func, parent=obj)
         assert obj.methods == {None: mock_Method.return_value}
         assert func._micropath_handler is True
+        assert func._micropath_elem is obj
 
     def test_route_with_methods(self, mocker):
         methods = {
@@ -877,6 +879,7 @@ class TestElement(object):
         assert mock_Method.call_count == 2
         assert obj.methods == methods
         assert func._micropath_handler is True
+        assert func._micropath_elem is obj
 
     def test_mount_base(self, mocker):
         mock_init = mocker.patch.object(
@@ -1229,6 +1232,7 @@ class TestBinding(object):
         assert result.before == set()
         assert result.after == set()
         assert result._validator is None
+        assert result._formatter is None
         mock_init.assert_called_once_with('ident', None)
 
     def test_init_alt(self, mocker):
@@ -1244,6 +1248,7 @@ class TestBinding(object):
         assert result.before == set(['b1', 'b2'])
         assert result.after == set(['a1', 'a2'])
         assert result._validator is None
+        assert result._formatter is None
         mock_init.assert_called_once_with('ident', 'parent')
 
     def test_hash(self):
@@ -1363,6 +1368,38 @@ class TestBinding(object):
 
         assert result == inj.return_value
         inj.assert_called_once_with('validator', 'controller', value='value')
+
+    def test_formatter_base(self):
+        obj = elements.Binding('ident')
+
+        result = obj.formatter('func')
+
+        assert result == 'func'
+        assert obj._formatter == 'func'
+
+    def test_formatter_already_set(self):
+        obj = elements.Binding('ident')
+        obj._formatter = 'spam'
+
+        with pytest.raises(ValueError):
+            obj.formatter('func')
+        assert obj._formatter == 'spam'
+
+    def test_format_unset(self):
+        obj = elements.Binding('ident')
+
+        result = obj.format('controller', 1234)
+
+        assert result == '1234'
+
+    def test_format_set(self, mocker):
+        obj = elements.Binding('ident')
+        obj._formatter = mocker.Mock(return_value='string')
+
+        result = obj.format('controller', 1234)
+
+        assert result == 'string'
+        obj._formatter.assert_called_once_with('controller', 1234)
 
 
 class TestMethod(object):

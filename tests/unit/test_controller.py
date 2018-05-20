@@ -48,10 +48,17 @@ class TestControllerMeta(object):
                     mocker.Mock(spec=elements.Method),
                 ],
                 _micropath_handler=False,
+                _micropath_elem=None,
             ),
-            'handler': mocker.Mock(
+            'handler1': mocker.Mock(
                 _micropath_methods=[],
                 _micropath_handler=True,
+                _micropath_elem=None,
+            ),
+            'handler2': mocker.Mock(
+                _micropath_methods=[],
+                _micropath_handler=True,
+                _micropath_elem='elem',
             ),
         }
 
@@ -61,8 +68,12 @@ class TestControllerMeta(object):
 
         assert result._micropath_root == mock_Root.return_value
         assert result._micropath_handlers == {
-            'handler': namespace['handler'],
+            'handler1': namespace['handler1'],
+            'handler2': namespace['handler2'],
         }
+        assert result.func._micropath_elem is None
+        assert result.handler1._micropath_elem == mock_Root.return_value
+        assert result.handler2._micropath_elem == 'elem'
         mock_Root.assert_called_once_with()
         mock_Root.return_value.add_elem.assert_has_calls([
             mocker.call(namespace['elem1'], 'elem1'),

@@ -66,6 +66,10 @@ class ControllerMeta(type):
             if getattr(value, '_micropath_handler', False):
                 handlers[ident] = value
 
+                # If it doesn't have an elem, set it to the root
+                if getattr(value, '_micropath_elem', None) is None:
+                    value._micropath_elem = root
+
         # Add the root and handlers list to the namespace
         namespace.update(
             _micropath_root=root,

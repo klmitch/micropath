@@ -238,8 +238,9 @@ class Element(object):
                 meth = Method(None, func, parent=self)
                 self.methods[meth.ident] = meth
 
-            # Mark the function as a handler
+            # Mark the function as a handler and save its element
             func._micropath_handler = True
+            func._micropath_elem = self
 
             return func
 
@@ -496,8 +497,9 @@ class Binding(Element):
         self.before = set(before or [])
         self.after = set(after or [])
 
-        # Initialize the validator
+        # Initialize the validator and formatter
         self._validator = None
+        self._formatter = None
 
     def __hash__(self):
         """
@@ -628,6 +630,8 @@ class Binding(Element):
         :param obj: The instance of the controller class.  This must
                     be passed so that ``self`` can be present in the
                     decorated method.
+        :param inj: The dependency injector.
+        :type inj: ``micropath.injector.Injector``
         :param value: The value to validate.
 
         :returns: A suitably transformed value.
@@ -639,9 +643,59 @@ class Binding(Element):
 
         # Call the validator
         if self._validator:
-            value = inj(self._validator, obj, value=value)
+            return inj(self._validator, obj, value=value)
 
         return value
+
+    def formatter(self, func):
+        """
+        A function decorator that sets the formatter function for the
+        binding.  If this decorator is not used, binding values will
+        be converted to URL elements using a simple string conversion
+        (``six.text_type`` called on the value).
+
+        Besides ``self``, the formatter function is only passed the
+        value; unlike with the ``@validator`` function, dependency
+        injection is not available.  The formatter function must
+        return a string value.
+
+        :param func: The function being decorated.
+
+        :returns: The function that was decorated (``func``).
+
+        :raises ValueError:
+            The formatter function has already been set.
+        """
+
+        # Elements must be immutable
+        if self._formatter:
+            raise ValueError('formatter has already been set')
+
+        # Save the formatter and return the decorated function
+        self._formatter = func
+        return func
+
+    def format(self, obj, value):
+        """
+        Format a value.  This converts the value of a binding parameter
+        back into a textual URL path component.  If a ``@formatter``
+        function has not been set, the value is converted using simple
+        string conversion (``six.text_type`` called on the value).
+
+        :param obj: The instance of the controller class.  This must
+                    be passed so that ``self`` can be present in the
+                    decorated method.
+        :param value: The value to validate.
+
+        :returns: A suitably transformed value.
+        :rtype: ``str``
+        """
+
+        # Call the formatter
+        if self._formatter:
+            return self._formatter(obj, value)
+
+        return six.text_type(value)
 
 
 class Method(Element):
