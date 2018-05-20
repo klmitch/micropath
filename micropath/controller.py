@@ -57,10 +57,10 @@ class ControllerMeta(type):
                 root.add_elem(value, ident)
                 continue
 
-            # Set the element of Delegation if needed
+            # Mount the delegation to the root
             if (isinstance(value, elements.Delegation) and
                     value.element is None):
-                value.element = root
+                root.mount(value)
                 continue
 
             # Add HTTP methods to the root as well

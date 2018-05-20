@@ -73,12 +73,13 @@ class TestControllerMeta(object):
             'handler1': namespace['handler1'],
             'handler2': namespace['handler2'],
         }
-        assert result.deleg1.element == mock_Root.return_value
-        assert result.deleg2.element == 'elem'
         assert result.func._micropath_elem is None
         assert result.handler1._micropath_elem == mock_Root.return_value
         assert result.handler2._micropath_elem == 'elem'
         mock_Root.assert_called_once_with()
+        mock_Root.return_value.mount.assert_called_once_with(
+            namespace['deleg1'],
+        )
         mock_Root.return_value.add_elem.assert_has_calls([
             mocker.call(namespace['elem1'], 'elem1'),
             mocker.call(namespace['elem2'], 'elem2'),

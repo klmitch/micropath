@@ -13,14 +13,14 @@
 # permissions and limitations under the License.
 
 from micropath.controller import Controller
-from micropath.elements import path, bind, route, mount
+from micropath.elements import Delegation, path, bind, route, mount
 from micropath.injector import inject, wraps, call_wrapped, wants
 from micropath.request import Request
 
 __all__ = [
     'Controller',
 
-    'path', 'bind', 'route', 'mount',
+    'Delegation', 'path', 'bind', 'route', 'mount',
 
     'inject', 'wraps', 'call_wrapped', 'wants',
 
