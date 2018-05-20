@@ -42,6 +42,8 @@ class TestControllerMeta(object):
         namespace = {
             'elem1': mocker.Mock(spec=elements.Path),
             'elem2': mocker.Mock(spec=elements.Binding),
+            'deleg1': mocker.Mock(spec=elements.Delegation, element=None),
+            'deleg2': mocker.Mock(spec=elements.Delegation, element='elem'),
             'func': mocker.Mock(
                 _micropath_methods=[
                     mocker.Mock(spec=elements.Method),
@@ -71,6 +73,8 @@ class TestControllerMeta(object):
             'handler1': namespace['handler1'],
             'handler2': namespace['handler2'],
         }
+        assert result.deleg1.element == mock_Root.return_value
+        assert result.deleg2.element == 'elem'
         assert result.func._micropath_elem is None
         assert result.handler1._micropath_elem == mock_Root.return_value
         assert result.handler2._micropath_elem == 'elem'

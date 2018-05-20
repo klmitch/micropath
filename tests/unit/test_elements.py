@@ -1702,11 +1702,14 @@ class TestDelegation(object):
         mock_construct = mocker.patch.object(elements.Delegation, 'construct')
         target = object()
         obj = elements.Delegation('controller', {})
+        obj.element = 'element'
 
         result = obj.get(target)
 
         assert result == mock_construct.return_value
         assert obj._cache == {id(target): mock_construct.return_value}
+        assert mock_construct.return_value._micropath_parent is target
+        assert mock_construct.return_value._micropath_elem == 'element'
         mock_construct.assert_called_once_with(target)
 
     def test_construct(self, mocker):

@@ -57,6 +57,12 @@ class ControllerMeta(type):
                 root.add_elem(value, ident)
                 continue
 
+            # Set the element of Delegation if needed
+            if (isinstance(value, elements.Delegation) and
+                    value.element is None):
+                value.element = root
+                continue
+
             # Add HTTP methods to the root as well
             if hasattr(value, '_micropath_methods'):
                 for meth in value._micropath_methods:

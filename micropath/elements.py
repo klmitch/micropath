@@ -1121,6 +1121,10 @@ class Delegation(object):
         if key not in self._cache:
             self._cache[key] = self.construct(obj)
 
+            # Set the parent and element
+            self._cache[key]._micropath_parent = obj
+            self._cache[key]._micropath_elem = self.element
+
         return self._cache[key]
 
     def construct(self, obj):
