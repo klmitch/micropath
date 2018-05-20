@@ -13,8 +13,12 @@
 # permissions and limitations under the License.
 
 import six
+import webob.dec
+import webob.exc
 
 from micropath import elements
+from micropath import injector
+from micropath import request
 
 
 class ControllerMeta(type):
@@ -77,7 +81,440 @@ class Controller(object):
     ``micropath.path()``, ``micropath.bind()``, and
     ``micropath.mount()`` functions and the ``@micropath.route()``
     decorator for how to create the necessary routes.
+
+    This class has some attributes that subclasses may set if desired,
+    to control behavior.  Those class attributes are as follows:
+
+    * ``micropath_request`` - The class to use for representing a
+        request.  This must be a subclass of ``micropath.Request``.
+    * ``micropath_methods`` - The ``micropath`` framework has a
+        default implementation for the "OPTIONS" HTTP method.  This
+        class attribute should contain a set of the HTTP methods that
+        are recognized if a default route is available (one for which
+        no methods have been passed to the ``@micropath.route()``
+        decorator).  The default contains "HEAD", "GET", "PUT",
+        "POST", "DELETE", and of course "OPTIONS".
+    * ``micropath_request_attrs`` - A dictionary of request attributes
+        that may be injected into handler methods.  The keys of this
+        dictionary are the parameter names the handler methods may
+        request, and the values are the names of the attribute of the
+        request.  A value of ``None`` indicates that the attribute has
+        the same name as the parameter name.  The default value allows
+        all request attributes to be injected; subclasses that
+        override this attribute may wish to copy the value from
+        ``micropath.Controller`` and then update it to list additional
+        attributes.
+
+    In addition to the class attributes listed above, subclasses may
+    also override several methods to control behavior.  The methods
+    that may be overridden are as follows:
+
+    * ``micropath_construct()`` - Called when a mounted class is
+        traversed.  The default implementation raises
+        ``NotImplementedError``, so if using ``micropath.mount()``,
+        the class must implement this method.  Since ``micropath``
+        does not provide any constraints on your controller class's
+        ``__init__()`` method, the intention of this hook method is to
+        allow the mounted class to be properly configured.  For
+        instance, if you load a configuration file and then pass it to
+        the ``config`` parameter of your root controller class's
+        ``__init__()`` method, you should implement
+        ``micropath_construct()`` to construct the other class with
+        that same configuration.
+    * ``micropath_prepare_injector()`` - Called immediately after the
+        dependency injector has been initialized.  This can be used to
+        add additional fields to the dependency injector.  Only the
+        implementation in the root ``Controller`` subclass is useful.
+    * ``micropath_bad_request()`` - Called if a handler method or the
+        injector raises a ``ValueError``.  This can happen prior to
+        calling the handler method if one of the attributes to be
+        injected into the handler is malformed in some fashion.  The
+        default implementation returns a bare
+        ``webob.exc.HTTPBadRequest``, which causes a 400 error to be
+        returned to the HTTP client.  This must be implemented in each
+        ``Controller`` subclass, so if customizing this hook, it is
+        recommended to create a base class with the desired
+        implementation, then subclass that.
+    * ``micropath_server_error()`` - Called if a handler method or the
+        injector raises any exception that is not
+        ``webob.exc.HTTPException`` or ``ValueError``.  The default
+        implementation returns a bare
+        ``webob.exc.HTTPInternalServerError``, which causes a 500
+        error to be returned to the HTTP client.  This must be
+        implemented in each ``Controller`` subclass, so if customizing
+        this hook, it is recommended to create a base class with the
+        desired implementation, then subclass that.
+    * ``micropath_not_found()`` - Called if the path could not be
+        resolved.  Note that this will not be called for a given
+        request if the handler function for that URL and HTTP method
+        includes the ``path_info`` parameter.  This must be
+        implemented in each ``Controller`` subclass, so if customizing
+        this hook, it is recommended to create a base class with the
+        desired implementation, then subclass that.
+    * ``micropath_not_implemented()`` - Called if the HTTP method is
+        not implemented.  This must be implemented in each
+        ``Controller`` subclass, so if customizing this hook, it is
+        recommended to create a base class with the desired
+        implementation, then subclass that.
+    * ``micropath_options()`` - Called if the HTTP method is "OPTIONS"
+        and the method isn't routed to a handler.  This method must
+        create a response that includes the "Allow" header with a
+        comma-separated list of methods.  This must be implemented in
+        each ``Controller`` subclass, so if customizing this hook, it
+        is recommended to create a base class with the desired
+        implementation, then subclass that.
     """
+
+    # Set the default class to use for requests
+    micropath_request = request.Request
+
+    # The set of methods to be considered implemented if a default
+    # route was added to a handler
+    micropath_methods = set([
+        'HEAD', 'GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'
+    ])
+
+    # Set the default set of request attributes to make injectable
+    micropath_request_attrs = {
+        'get': 'GET',
+        'post': 'POST',
+        'accept': None,
+        'accept_charset': None,
+        'accept_encoding': None,
+        'accept_language': None,
+        'application_url': None,
+        'authorization': None,
+        'base_path': None,
+        'body': None,
+        'body_file': None,
+        'body_file_raw': None,
+        'body_file_seekable': None,
+        'cache_control': None,
+        'charset': None,
+        'client_addr': None,
+        'content_length': None,
+        'content_type': None,
+        'cookies': None,
+        'date': None,
+        'domain': None,
+        'environ': None,
+        'headers': None,
+        'host': None,
+        'host_port': None,
+        'host_url': None,
+        'http_version': None,
+        'if_match': None,
+        'if_modified_since': None,
+        'if_none_match': None,
+        'if_range': None,
+        'if_unmodified_since': None,
+        'injector': None,
+        'is_body_readable': None,
+        'is_body_seekable': None,
+        'is_xhr': None,
+        'json': None,
+        'json_body': None,
+        'max_forwards': None,
+        'method': None,
+        'params': None,
+        'path': None,
+        'path_info': None,
+        'path_qs': None,
+        'path_url': None,
+        'pragma': None,
+        'query_string': None,
+        'range': None,
+        'referer': None,
+        'referrer': None,
+        'remote_addr': None,
+        'remote_user': None,
+        'scheme': None,
+        'script_name': None,
+        'server_name': None,
+        'server_port': None,
+        'text': None,
+        'url': None,
+        'url_encoding': None,
+        'urlargs': None,
+        'urlvars': None,
+        'user_agent': None,
+    }
+
+    def __call__(self, environ, start_response):
+        """
+        Contains the implementation of the WSGI application which is the
+        heart of the ``micropath`` framework.  This allows instances
+        of subclasses of ``Controller`` to be used as WSGI
+        applications.
+
+        :param dict environ: The WSGI environment.
+        :param start_response: The callable used to start the
+                               response.
+
+        :returns: The return value of invoking the response WSGI
+                  application, as returned by the handler methods.  If
+                  no handler method is available, an appropriate error
+                  will be generated to indicate that the path doesn't
+                  exist (404) or the method is unacceptable (405).
+        """
+
+        # Note: The contents of this method are mostly copied from the
+        # __call__() method of webob.dec.wsgify
+
+        # First, construct the request and set the default response
+        req = self.micropath_request(environ)
+        req.response = req.ResponseClass()
+
+        # Next, walk the path tree and invoke the handler
+        try:
+            # Use the injector cleanup context manager to explicitly
+            # break reference loops after we've dispatched to the
+            # handler method
+            with req.injector.cleanup() as injector:
+                # Populate the request and root_controller fields of
+                # the injector
+                injector['request'] = req
+                injector['root_controller'] = self
+
+                # Add deferred accessors for all the other fields
+                def defer(key):
+                    # Can't use operator.attrgetter because we need
+                    # the parameter to be named "request"
+                    def get(request):
+                        return getattr(request, key)
+                    return get
+                for key, mapped in self.micropath_request_attrs.items():
+                    injector.set_deferred(key, defer(mapped or key))
+
+                # Hook for setting up additional injection settings
+                self.micropath_prepare_injector(req, injector)
+
+                resp = self._micropath_dispatch(req, injector)
+        except webob.exc.HTTPException as exc:
+            resp = exc
+        except ValueError as exc:
+            # Some error occurred; we'll turn it into a bad request
+            # error.  This is here as a last resort; these exceptions
+            # should be caught and handled by _micropath_dispatch()
+            resp = self.micropath_bad_request(req, exc)
+        except Exception as exc:
+            # Some other error occurred; we'll turn it into an
+            # internal server error.  This is here as a last resort;
+            # these exceptions should be caught and handled by
+            # _micropath_dispatch()
+            resp = self.micropath_server_error(req, exc)
+
+        # Use the default response if none was returned
+        if resp is None:
+            resp = req.response
+
+        # Convert text and bytes
+        if isinstance(resp, six.text_type):
+            resp = resp.encode(req.charset)
+        if isinstance(resp, bytes):
+            body = resp
+            resp = req.response
+            resp.write(body)
+
+        # Merge the cookies
+        if resp is not req.response:
+            resp = req.response.merge_cookies(resp)
+
+        # Return the response
+        return resp(environ, start_response)
+
+    def _micropath_dispatch(self, req, inj):
+        """
+        Walk the element tree based on the URL path in the request.  This
+        method is used to locate the correct handler to invoke for a
+        given request, or to invoke a proper delegation to handle the
+        next part of the request URL.
+
+        :param req: The request being processed.
+        :type req: ``micropath.Request``
+        :param inj: The injector.  This will have bindings added to
+                    it, and will be used to invoke the handler method.
+        :type inj: ``micropath.injector.Injector``
+
+        :returns: The result of invoking the handler method.  If the
+                  handler method raises an exception, that exception
+                  will be converted into a ``webob.response.Response``
+                  object (typically by calling the
+                  ``micropath_bad_request()`` or
+                  ``micropath_server_error()`` hook methods) and
+                  returned.
+        """
+
+        # Resolve the path to a Path or Binding
+        try:
+            elem, path_info_required = self._micropath_resolve(req, inj)
+        except webob.exc.HTTPException as exc:
+            return exc
+        except ValueError as exc:
+            # Some error occurred; we'll turn it into a bad request
+            # error.
+            return self.micropath_bad_request(req, exc)
+        except Exception as exc:
+            # Some other error occurred; we'll turn it into an
+            # internal server error.
+            return self.micropath_server_error(req, exc)
+
+        # Get the matching function and delegation
+        func, delegation = self._micropath_delegation(req, elem)
+
+        # First, is there a function?
+        if (func and
+                (not path_info_required or injector.wants(func, 'path_info'))):
+            try:
+                return inj(func, self)
+            except webob.exc.HTTPException as exc:
+                return exc
+            except ValueError as exc:
+                # Some error occurred; we'll turn it into a bad
+                # request error.
+                return self.micropath_bad_request(req, exc)
+            except Exception as exc:
+                # Some other error occurred; we'll turn it into an
+                # internal server error.
+                return self.micropath_server_error(req, exc)
+
+        # OK, delegate if needed
+        if delegation:
+            # Get the object being delegated to
+            obj = delegation.get(self)
+
+            # Dispatch to it
+            return obj._micropath_dispatch(req, inj)
+
+        # We couldn't find an implementation...
+        if path_info_required or not elem.methods:
+            # Couldn't find the path; we'll return a 404
+            return self.micropath_not_found(req, req.path_info)
+        elif elem.methods and req.method == 'OPTIONS':
+            meths = self._micropath_methods(elem)
+
+            # Generate and return the OPTIONS response
+            return self.micropath_options(req, list(sorted(meths)))
+
+        # Couldn't find an implementation for the method
+        return self.micropath_not_implemented(req, req.method)
+
+    def _micropath_resolve(self, req, inj):
+        """
+        Resolve the request URL path to a specific path element.  This
+        will set up injections for any variable bindings, as well as
+        setting the variable bindings on the request's ``urlvars``
+        dictionary.
+
+        :param req: The request being processed.
+        :type req: ``micropath.Request``
+        :param inj: The injector.  This will have bindings added to
+                    it.
+        :type inj: ``micropath.injector.Injector``
+
+        :returns: A tuple of the found path element (either
+                  ``micropath.elements.Path`` or
+                  ``micropath.elements.Binding``) and a boolean
+                  indicating whether the ``path_info`` of the request
+                  has been exhausted--if ``True``, the implementing
+                  function must want the ``path_info`` attribute, or a
+                  404 will be generated.
+        """
+
+        # Must the handler have path_info?
+        path_info_required = True
+
+        # Start at the controller's root
+        elem = self._micropath_root
+        path_elem = req.path_info_peek()
+        while path_elem:
+            # If it's a static path, we'll go down that branch
+            if path_elem in elem.paths:
+                elem = elem.paths[path_elem]
+            else:
+                # Try matching against bindings
+                for name, binding in elem.bindings.items():
+                    try:
+                        value = binding.validate(self, inj, path_elem)
+                    except elements.SkipBinding:
+                        continue
+                    break
+                else:
+                    # Didn't match against any of the bindings
+                    break
+
+                # Save it into the injector and the urlvars
+                inj[name] = value
+                req.urlvars[name] = value
+
+                # Set the next element
+                elem = binding
+
+            # OK, pop off the path element and set up for the next one
+            req.path_info_pop()
+            path_elem = req.path_info_peek()
+        else:
+            # Ran off the end of the path_info
+            path_info_required = False
+
+        return elem, path_info_required
+
+    def _micropath_delegation(self, req, elem):
+        """
+        Determine what function or mount point to delegate the request to.
+
+        :param req: The request being processed.
+        :type req: ``micropath.Request``
+
+        :param elem: The path element at which to resolve the
+                     delegation.
+        :type elem: ``micropath.elements.Element``
+
+        :returns: A tuple of the function and a delegation.  Either or
+                  both may be ``None``.  If the delegation is not
+                  ``None``, it will be an instance of
+                  ``micropath.elements.Delegation``.
+        """
+
+        # Pick out the Method instance
+        meth = elem.methods.get(
+            'GET' if req.method == 'HEAD' else req.method,
+            elem.methods.get(None),
+        )
+
+        return (
+            meth.func if meth else None,
+            meth.delegation if meth else elem.delegation,
+        )
+
+    def _micropath_methods(self, elem):
+        """
+        Determine the methods available at a particular point in the URL
+        hierarchy.
+
+        :param elem: The path element.
+        :type elem: ``micropath.elements.Element``
+
+        :returns: A set of the HTTP methods that are implemented at
+                  this point of the URL hierarchy.
+        :rtype: ``set`` of ``str``
+        """
+
+        # First, get the set of methods we see in elem.methods
+        meths = set(m for m in elem.methods if m is not None)
+
+        # Next, add the micropath_methods if None is in
+        # elem.methods
+        if None in elem.methods:
+            meths |= self.micropath_methods
+
+        # Now, add the fixed options: HEAD (if GET is present)
+        # and, of course, OPTIONS
+        if 'GET' in meths:
+            meths.add('HEAD')
+        meths.add('OPTIONS')
+
+        return meths
 
     def micropath_construct(self, other, kwargs):
         """
@@ -99,3 +536,122 @@ class Controller(object):
             'unable to construct class "%s.%s"' %
             (other.__class__.__module__, other.__class__.__name__)
         )
+
+    def micropath_prepare_injector(self, request, injector):
+        """
+        A hook method for injector preparation.  This allows subclasses to
+        add things to the injector if needed.
+
+        :param request: The request being processed.
+        :type request: ``micropath.Request``
+        :param injector: The injector being prepared.  Implementations
+                         can assign values using dictionary syntax, or
+                         may set functions that will be called with
+                         appropriate arguments (using dependency
+                         injection) using the
+                         ``injector.set_deferred()`` method.  The
+                         ``injector.set_deferred()`` method takes the
+                         name of the parameter and the implementing
+                         function as its two required arguments, and
+                         the function is expected to return the value
+                         that will be injected as an argument.
+        :type injector: ``micropath.injector.Injector``
+        """
+
+        pass  # pragma: no cover
+
+    def micropath_bad_request(self, request, cause):
+        """
+        A hook method for handling the case that a ``ValueError`` was
+        raised during request processing.  This usually happens
+        because some field to be injected into a handler method was
+        malformed.
+
+        :param request: The request that caused the error to be
+                        raised.  Note that the contents of the
+                        ``injector`` attribute may have been discarded
+                        and should not be repopulated.
+        :param cause: The ``ValueError`` exception that caused this
+                      method to be called.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a bare ``webob.exc.HTTPBadRequest``.  Note
+                  that, for security reasons, the text of the
+                  ``cause`` is *not* included: some exception text may
+                  include sensitive data, such as paths.
+        """
+
+        return webob.exc.HTTPBadRequest()
+
+    def micropath_server_error(self, request, cause):
+        """
+        A hook method for handling the case that an exception that was not
+        a ``ValueError`` or ``webob.exc.HTTPException`` was raised during
+        request processing.
+
+        :param request: The request that caused the error to be
+                        raised.  Note that the contents of the
+                        ``injector`` attribute may have been discarded
+                        and should not be repopulated.
+        :param cause: The exception that caused this method to be
+                      called.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a bare
+                  ``webob.exc.HTTPInternalServerError``.  Note that,
+                  for security reasons, the text of the ``cause`` is
+                  *not* included: some exception text may include
+                  sensitive data, such as paths.
+        """
+
+        return webob.exc.HTTPInternalServerError()
+
+    def micropath_not_found(self, request, path_info):
+        """
+        A hook method for the case that the path could not be fully
+        resolved.
+
+        :param request: The request that caused the error to be
+                        encountered.
+        :param str path_info: The remaining portions of the URL path
+                              that could not be resolved.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a bare ``webob.exc.HTTPNotfound``.
+        """
+
+        return webob.exc.HTTPNotFound()
+
+    def micropath_not_implemented(self, request, method):
+        """
+        A hook method for the case that the request method is not
+        implemented.
+
+        :param request: The request that caused the error to be
+                        encountered.
+        :param str method: The HTTP method that was not implemented.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a bare ``webob.exc.HTTPNotImplemented``.
+        """
+
+        return webob.exc.HTTPNotImplemented()
+
+    def micropath_options(self, request, methods):
+        """
+        A hook method for implementing the response to the OPTIONS HTTP
+        method.
+
+        :param request: The request that caused the default OPTIONS
+                        handler to be invoked.
+        :param methods: A sorted list of HTTP methods.  This should be
+                        turned into a comma-separated list and placed
+                        in the response's "Allow" header.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a ``webob.exc.HTTPNoContent`` with the
+                  "Allow" header set to the comma-separated list of
+                  allowed HTTP methods.
+        """
+
+        return webob.exc.HTTPNoContent(headers={'Allow': ','.join(methods)})
