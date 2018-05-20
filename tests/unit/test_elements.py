@@ -1345,21 +1345,24 @@ class TestBinding(object):
             obj.validator('func')
         assert obj._validator == 'spam'
 
-    def test_validate_unset(self):
+    def test_validate_unset(self, mocker):
+        inj = mocker.Mock()
         obj = elements.Binding('ident')
 
-        result = obj.validate('controller', 'value')
+        result = obj.validate('controller', inj, 'value')
 
         assert result == 'value'
+        inj.assert_not_called()
 
     def test_validate_set(self, mocker):
+        inj = mocker.Mock()
         obj = elements.Binding('ident')
-        obj._validator = mocker.Mock()
+        obj._validator = 'validator'
 
-        result = obj.validate('controller', 'value')
+        result = obj.validate('controller', inj, 'value')
 
-        assert result == obj._validator.return_value
-        obj._validator.assert_called_once_with('controller', 'value')
+        assert result == inj.return_value
+        inj.assert_called_once_with('validator', 'controller', value='value')
 
 
 class TestMethod(object):

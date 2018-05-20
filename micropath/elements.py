@@ -592,12 +592,16 @@ class Binding(Element):
         """
         A function decorator that sets the validator function for the
         binding.  If this decorator is not used, no validator function
-        is set and the binding always validates.  Note that the return
+        is set and the binding always validates.
+
+        The validator function must define a ``value`` parameter,
+        which will receive the text value of the path element.
+        Dependency injection is used, so the validator function may
+        request any other request parameter.  Note that the return
         value of the validator function becomes the value of the
         variable.  Also note that the validator function may raise
         ``SkipBinding`` to cause the next binding to be evaluated; any
-        other exception will be logged, and the client will receive a
-        404.
+        other exception will be bubbled up to the client.
 
         :param func: The function being decorated.
 
@@ -615,7 +619,7 @@ class Binding(Element):
         self._validator = func
         return func
 
-    def validate(self, obj, value):
+    def validate(self, obj, inj, value):
         """
         Validate a value.  This invokes the validator, if one is set, and
         returns the suitably transformed value to assign to the
@@ -635,7 +639,7 @@ class Binding(Element):
 
         # Call the validator
         if self._validator:
-            value = self._validator(obj, value)
+            value = inj(self._validator, obj, value=value)
 
         return value
 
