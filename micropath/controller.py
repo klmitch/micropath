@@ -12,6 +12,8 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
+import traceback
+
 import six
 import webob.dec
 import webob.exc
@@ -94,6 +96,15 @@ class Controller(object):
         no methods have been passed to the ``@micropath.route()``
         decorator).  The default contains "HEAD", "GET", "PUT",
         "POST", "DELETE", and of course "OPTIONS".
+    * ``micropath_debug`` - A class attribute that is set to
+        ``False``.  This may be shadowed by an instance attribute of
+        the same name to enable debugging responses; this will include
+        traceback and debugging information in the 500 error generated
+        if the ``micropath_bad_request()`` or
+        ``micropath_server_error()`` hook methods raise an exception.
+        WARNING: THIS ATTRIBUTE MUST NOT BE SET TO ``True`` ON
+        PRODUCTION SERVERS!  Exception information can leak
+        security-sensitive data to callers.
     * ``micropath_request_attrs`` - A dictionary of request attributes
         that may be injected into handler methods.  The keys of this
         dictionary are the parameter names the handler methods may
@@ -173,6 +184,10 @@ class Controller(object):
     micropath_methods = set([
         'HEAD', 'GET', 'PUT', 'POST', 'DELETE', 'OPTIONS'
     ])
+
+    # Controls debugging.  THIS ATTRIBUTE MUST NOT BE True ON
+    # PRODUCTION SERVERS!
+    micropath_debug = False
 
     # Set the default set of request attributes to make injectable
     micropath_request_attrs = {
@@ -268,40 +283,54 @@ class Controller(object):
         # Next, walk the path tree and invoke the handler; we use the
         # injector cleanup context manager to explicitly break
         # reference loops after we've dispatched to the handler method
-        with req.injector.cleanup() as injector:
-            try:
-                # Populate the request and root_controller fields of
-                # the injector
-                injector['request'] = req
-                injector['root_controller'] = self
+        try:
+            with req.injector.cleanup() as injector:
+                try:
+                    # Populate the request and root_controller fields of
+                    # the injector
+                    injector['request'] = req
+                    injector['root_controller'] = self
 
-                # Add deferred accessors for all the other fields
-                def defer(key):
-                    # Can't use operator.attrgetter because we need
-                    # the parameter to be named "request"
-                    def get(request):
-                        return getattr(request, key)
-                    return get
-                for key, mapped in self.micropath_request_attrs.items():
-                    injector.set_deferred(key, defer(mapped or key))
+                    # Add deferred accessors for all the other fields
+                    def defer(key):
+                        # Can't use operator.attrgetter because we need
+                        # the parameter to be named "request"
+                        def get(request):
+                            return getattr(request, key)
+                        return get
+                    for key, mapped in self.micropath_request_attrs.items():
+                        injector.set_deferred(key, defer(mapped or key))
 
-                # Hook for setting up additional injection settings
-                self.micropath_prepare_injector(req, injector)
+                    # Hook for setting up additional injection settings
+                    self.micropath_prepare_injector(req, injector)
 
-                resp = self._micropath_dispatch(req, injector)
-            except webob.exc.HTTPException as exc:
-                resp = exc
-            except ValueError as exc:
-                # Some error occurred; we'll turn it into a bad request
-                # error.  This is here as a last resort; these exceptions
-                # should be caught and handled by _micropath_dispatch()
-                resp = self.micropath_bad_request(req, exc)
-            except Exception as exc:
-                # Some other error occurred; we'll turn it into an
-                # internal server error.  This is here as a last resort;
-                # these exceptions should be caught and handled by
-                # _micropath_dispatch()
-                resp = self.micropath_server_error(req, exc)
+                    resp = self._micropath_dispatch(req, injector)
+                except webob.exc.HTTPException as exc:
+                    resp = exc
+                except ValueError as exc:
+                    # Some error occurred; we'll turn it into a bad request
+                    # error.  This is here as a last resort; these exceptions
+                    # should be caught and handled by _micropath_dispatch()
+                    resp = self.micropath_bad_request(req, exc)
+                except Exception as exc:
+                    # Some other error occurred; we'll turn it into an
+                    # internal server error.  This is here as a last resort;
+                    # these exceptions should be caught and handled by
+                    # _micropath_dispatch()
+                    resp = self.micropath_server_error(req, exc)
+        except Exception:
+            # An exception could be raised by micropath_bad_request()
+            # or micropath_server_error(); this clause acts as an
+            # absolute last resort to ensure that no exception makes
+            # it all the way up the stack.  Begin by formulating the
+            # detail for debugging purposes
+            detail = None
+            if self.micropath_debug:
+                # Debugging detail requested; format traceback
+                detail = traceback.format_exc()
+
+            # Construct the exception
+            resp = webob.exc.HTTPInternalServerError(detail)
 
         # Use the default response if none was returned
         if resp is None:
