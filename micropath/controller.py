@@ -79,7 +79,7 @@ class Controller(object):
     decorator for how to create the necessary routes.
     """
 
-    def construct(self, other, kwargs):
+    def micropath_construct(self, other, kwargs):
         """
         Construct another controller.  This is called on objects which
         have other controller classes mounted on them, in order to

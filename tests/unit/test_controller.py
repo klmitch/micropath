@@ -67,8 +67,8 @@ class TestControllerMeta(object):
 
 
 class TestController(object):
-    def test_construct(self):
+    def test_micropath_construct(self):
         obj = controller.Controller()
 
         with pytest.raises(NotImplementedError):
-            obj.construct('other', {})
+            obj.micropath_construct('other', {})

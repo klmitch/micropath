@@ -1678,8 +1678,10 @@ class TestDelegation(object):
 
         result = obj.construct(target)
 
-        assert result == target.construct.return_value
-        target.construct.assert_called_once_with('controller', 'kwargs')
+        assert result == target.micropath_construct.return_value
+        target.micropath_construct.assert_called_once_with(
+            'controller', 'kwargs',
+        )
 
 
 class TestPathFunc(object):

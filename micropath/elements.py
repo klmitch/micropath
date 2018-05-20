@@ -261,7 +261,7 @@ class Element(object):
 
         Additional keyword arguments will be passed when creating a
         ``Delegation``, which will subsequently pass them to the
-        controller's ``construct()`` method.
+        controller's ``micropath_construct()`` method.
 
         :param delegation: Another controller to delegate to.  This
                            may be a ``micropath.Controller`` class
@@ -979,9 +979,9 @@ class Delegation(object):
     """
     Default delegation for controller classes.  Implements the
     descriptor protocol.  Subclasses should override the
-    ``construct()`` method, which is passed the controller instance
-    the delegation exists in and should return a new instance of the
-    controller class passed to the constructor.
+    ``micropath_construct()`` method, which is passed the controller
+    instance the delegation exists in and should return a new instance
+    of the controller class passed to the constructor.
     """
 
     def __init__(self, controller, kwargs):
@@ -1073,7 +1073,8 @@ class Delegation(object):
         """
         Construct a new instance of the controller class passed to the
         constructor.  This default implementation calls the
-        ``from_controller()`` class method, passing it ``obj``.
+        ``micropath_construct()`` method, passing it the controller
+        class and the keyword arguments set at mount time.
 
         :param obj: An instance of the class the class attribute is a
                     member of.
@@ -1082,7 +1083,7 @@ class Delegation(object):
                   class passed to the constructor.
         """
 
-        return obj.construct(self.controller, self.kwargs)
+        return obj.micropath_construct(self.controller, self.kwargs)
 
 
 def path(ident=None):
