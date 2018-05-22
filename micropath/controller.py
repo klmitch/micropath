@@ -46,8 +46,8 @@ class ControllerMeta(type):
         # Construct a new Root
         root = elements.Root()
 
-        # Collect handlers
-        handlers = {}
+        # Collect delegations
+        delegations = {}
 
         # Walk the namespace looking for elements and callables with
         # Method elements
@@ -57,21 +57,24 @@ class ControllerMeta(type):
                 root.add_elem(value, ident)
                 continue
 
-            # Mount the delegation to the root
-            if (isinstance(value, elements.Delegation) and
-                    value.element is None):
-                root.mount(value)
-                continue
-
             # Add HTTP methods to the root as well
             if hasattr(value, '_micropath_methods'):
                 for meth in value._micropath_methods:
                     root.add_elem(meth, ident)
 
-            # Collect the list of handlers
-            if getattr(value, '_micropath_handler', False):
-                handlers[ident] = value
+            # Mount the delegation to the root
+            if isinstance(value, elements.Delegation):
+                if value.element is None:
+                    root.mount(value)
+                else:
+                    root.add_elem(value.element, ident)
 
+                # Add it to the set of delegations
+                delegations[ident] = value
+                continue
+
+            # Deal with handlers
+            if getattr(value, '_micropath_handler', False):
                 # If it doesn't have an elem, set it to the root
                 if getattr(value, '_micropath_elem', None) is None:
                     value._micropath_elem = root
@@ -79,7 +82,10 @@ class ControllerMeta(type):
         # Add the root and handlers list to the namespace
         namespace.update(
             _micropath_root=root,
-            _micropath_handlers=handlers,
+            _micropath_delegations=[
+                delegation for _name, delegation in
+                sorted(delegations.items(), key=lambda x: x[0])
+            ],
         )
 
         return super(ControllerMeta, cls).__new__(cls, name, bases, namespace)
@@ -131,17 +137,18 @@ class Controller(object):
     that may be overridden are as follows:
 
     * ``micropath_construct()`` - Called when a mounted class is
-        traversed.  The default implementation raises
-        ``NotImplementedError``, so if using ``micropath.mount()``,
-        the class must implement this method.  Since ``micropath``
-        does not provide any constraints on your controller class's
-        ``__init__()`` method, the intention of this hook method is to
-        allow the mounted class to be properly configured.  For
-        instance, if you load a configuration file and then pass it to
-        the ``config`` parameter of your root controller class's
-        ``__init__()`` method, you should implement
-        ``micropath_construct()`` to construct the other class with
-        that same configuration.
+        traversed.  The default implementation constructs the mounted
+        class with only the passed keyword arguments, so if using
+        ``micropath.mount()`` and the controller classes require other
+        arguments (e.g., configuration), the class must implement this
+        method.  Since ``micropath`` does not provide any constraints
+        on your controller class's ``__init__()`` method, the
+        intention of this hook method is to allow the mounted class to
+        be properly configured.  For instance, if you load a
+        configuration file and then pass it to the ``config``
+        parameter of your root controller class's ``__init__()``
+        method, you should implement ``micropath_construct()`` to
+        construct the other class with that same configuration.
     * ``micropath_prepare_injector()`` - Called immediately after the
         dependency injector has been initialized.  This can be used to
         add additional fields to the dependency injector.  Only the
@@ -184,6 +191,14 @@ class Controller(object):
         each ``Controller`` subclass, so if customizing this hook, it
         is recommended to create a base class with the desired
         implementation, then subclass that.
+
+    Finally, the ``Controller`` base class defines an ``__init__()``
+    method that all subclasses must ensure is called with no
+    arguments.  This base ``__init__()`` method instantiates the
+    mounted controllers, in order to ensure that there are no race
+    conditions during request processing in the face of threaded WSGI
+    servers.  This means that the ``micropath`` framework is itself
+    thread-safe, without needing to use any threading primitives.
     """
 
     # Set the default class to use for requests
@@ -265,6 +280,19 @@ class Controller(object):
         'user_agent': None,
     }
 
+    def __init__(self):
+        """
+        Initialize a ``Controller`` instance.  Subclasses must call the
+        superclass method to properly initialize the controller.
+        """
+
+        # Initialize delegations; this ensures that all subordinate
+        # controllers are initialized at the time the root controller
+        # is, thus avoiding any threading issues within the
+        # Delegations.get() logic
+        for deleg in self._micropath_delegations:
+            deleg.get(self)
+
     def __call__(self, environ, start_response):
         """
         Contains the implementation of the WSGI application which is the
@@ -296,6 +324,9 @@ class Controller(object):
         try:
             with req.injector.cleanup() as injector:
                 try:
+                    # Add anything from the request's urlvars
+                    injector.update(req.urlvars)
+
                     # Populate the request and root_controller fields of
                     # the injector
                     injector['request'] = req
@@ -482,7 +513,10 @@ class Controller(object):
                     break
 
                 # Save it into the injector and the urlvars
-                inj[name] = value
+                if name not in inj:
+                    # Only add to the injector if there are no
+                    # conflicts
+                    inj[name] = value
                 req.urlvars[name] = value
 
                 # Set the next element
@@ -522,7 +556,7 @@ class Controller(object):
 
         return (
             meth.func if meth else None,
-            meth.delegation if meth else elem.delegation,
+            (meth.delegation or elem.delegation) if meth else elem.delegation,
         )
 
     def _micropath_methods(self, elem):
@@ -558,22 +592,17 @@ class Controller(object):
         """
         Construct another controller.  This is called on objects which
         have other controller classes mounted on them, in order to
-        construct the other controller.  Implementors MUST override
-        this method if a controller is mounted.
+        construct the other controller.
 
         :param other: The other controller class to construct.
         :param dict kwargs: Additional keyword arguments passed when
                             setting up the mount point.
 
         :returns: An instance of the other controller class, properly
-                  initialized.  Note that the default implementation
-                  raises ``NotImplementedError``.
+                  initialized.
         """
 
-        raise NotImplementedError(
-            'unable to construct class "%s.%s"' %
-            (other.__class__.__module__, other.__class__.__name__)
-        )
+        return other(**kwargs)
 
     def micropath_prepare_injector(self, request, injector):
         """

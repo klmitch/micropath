@@ -14,7 +14,6 @@
 
 import collections
 
-import pytest
 import webob.exc
 
 from micropath import controller
@@ -34,7 +33,7 @@ class TestControllerMeta(object):
         )
 
         assert result._micropath_root == mock_Root.return_value
-        assert result._micropath_handlers == {}
+        assert result._micropath_delegations == []
         mock_Root.assert_called_once_with()
 
     def test_alt(self, mocker):
@@ -69,10 +68,10 @@ class TestControllerMeta(object):
         )
 
         assert result._micropath_root == mock_Root.return_value
-        assert result._micropath_handlers == {
-            'handler1': namespace['handler1'],
-            'handler2': namespace['handler2'],
-        }
+        assert result._micropath_delegations == [
+            namespace['deleg1'],
+            namespace['deleg2'],
+        ]
         assert result.func._micropath_elem is None
         assert result.handler1._micropath_elem == mock_Root.return_value
         assert result.handler2._micropath_elem == 'elem'
@@ -81,17 +80,35 @@ class TestControllerMeta(object):
             namespace['deleg1'],
         )
         mock_Root.return_value.add_elem.assert_has_calls([
+            mocker.call(namespace['deleg2'].element, 'deleg2'),
             mocker.call(namespace['elem1'], 'elem1'),
             mocker.call(namespace['elem2'], 'elem2'),
             mocker.call(namespace['func']._micropath_methods[0], 'func'),
             mocker.call(namespace['func']._micropath_methods[1], 'func'),
         ], any_order=True)
-        assert mock_Root.return_value.add_elem.call_count == 4
+        assert mock_Root.return_value.add_elem.call_count == 5
 
 
 class TestController(object):
-    def check_injector(self, obj, req, mocker):
+    def test_init(self, mocker):
+        delegations = [
+            mocker.Mock(),
+            mocker.Mock(),
+            mocker.Mock(),
+        ]
+        mocker.patch.object(
+            controller.Controller, '_micropath_delegations', delegations,
+        )
+
+        result = controller.Controller()
+
+        assert isinstance(result, controller.Controller)
+        for deleg in delegations:
+            deleg.get.assert_called_once_with(result)
+
+    def check_injector(self, obj, req, mocker, **kwargs):
         injector = req.injector.cleanup.return_value.__enter__.return_value
+        injector.update.assert_called_once_with(kwargs)
         injector.__setitem__.assert_has_calls([
             mocker.call('request', req),
             mocker.call('root_controller', obj),
@@ -110,7 +127,7 @@ class TestController(object):
         assert keys == set(controller.Controller.micropath_request_attrs)
 
     def test_call_base(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -154,10 +171,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_return_none(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -201,10 +218,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_return_text(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -250,10 +267,10 @@ class TestController(object):
         )
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_return_bytes(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -299,10 +316,10 @@ class TestController(object):
         )
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_http_exception(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -347,10 +364,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(exc)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_valueerror(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -396,10 +413,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_exceptionfortest(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -445,10 +462,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_last_resort_exception(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -495,10 +512,10 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_call_last_resort_exception_debug(self, mocker):
-        req = mocker.MagicMock(charset='utf-8')
+        req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
         inj = req.injector.cleanup.return_value.__enter__.return_value
         mock_Request = mocker.patch.object(
             controller.Controller, 'micropath_request',
@@ -546,7 +563,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker)
+        self.check_injector(obj, req, mocker, a=1)
 
     def test_micropath_dispatch_call_func(self, mocker):
         mock_wants = mocker.patch.object(
@@ -1352,6 +1369,47 @@ class TestController(object):
         elems['c'].validate.assert_called_once_with(obj, inj, '1')
         elems['e'].validate.assert_called_once_with(obj, inj, '2')
 
+    def test_micropath_resolve_injector_conflict(self, mocker):
+        elems = {
+            None: mocker.Mock(t_paths=['a'], t_bindings=[], skip=False),
+            'a': mocker.Mock(t_paths=[], t_bindings=['b', 'c'], skip=False),
+            'b': mocker.Mock(t_paths=[], t_bindings=[], skip=True),
+            'c': mocker.Mock(t_paths=['d'], t_bindings=[], skip=False),
+            'd': mocker.Mock(t_paths=[], t_bindings=['e'], skip=False),
+            'e': mocker.Mock(t_paths=[], t_bindings=[], skip=False),
+        }
+        for elem in elems.values():
+            if elem.skip:
+                elem.validate.side_effect = elements.SkipBinding()
+            elem.paths = {x: elems[x] for x in elem.t_paths}
+            elem.bindings = collections.OrderedDict(
+                (x, elems[x]) for x in elem.t_bindings
+            )
+        mocker.patch.object(
+            controller.Controller, '_micropath_root', elems[None],
+        )
+        req = mocker.Mock(**{
+            'path_info_peek.side_effect': ['a', '1', 'd', '2', ''],
+            'urlvars': {},
+        })
+        inj = {'e': 'x'}
+        obj = controller.Controller()
+
+        result = obj._micropath_resolve(req, inj)
+
+        assert result == (elems['e'], False)
+        assert inj == {
+            'c': elems['c'].validate.return_value,
+            'e': 'x',
+        }
+        assert req.urlvars == {
+            'c': elems['c'].validate.return_value,
+            'e': elems['e'].validate.return_value,
+        }
+        elems['b'].validate.assert_called_once_with(obj, inj, '1')
+        elems['c'].validate.assert_called_once_with(obj, inj, '1')
+        elems['e'].validate.assert_called_once_with(obj, inj, '2')
+
     def test_micropath_resolve_nomatch(self, mocker):
         elems = {
             None: mocker.Mock(t_paths=['a'], t_bindings=[], skip=False),
@@ -1399,6 +1457,16 @@ class TestController(object):
         result = obj._micropath_delegation(req, elem)
 
         assert result == (meth.func, meth.delegation)
+
+    def test_micropath_delegation_elem_delegation(self, mocker):
+        req = mocker.Mock(method='GET')
+        meth = mocker.Mock(delegation=None)
+        elem = mocker.Mock(methods={'GET': meth})
+        obj = controller.Controller()
+
+        result = obj._micropath_delegation(req, elem)
+
+        assert result == (meth.func, elem.delegation)
 
     def test_micropath_delegation_head(self, mocker):
         req = mocker.Mock(method='HEAD')
@@ -1463,11 +1531,14 @@ class TestController(object):
             controller.Controller.micropath_methods | set(['PATCH'])
         )
 
-    def test_micropath_construct(self):
+    def test_micropath_construct(self, mocker):
+        other = mocker.Mock()
         obj = controller.Controller()
 
-        with pytest.raises(NotImplementedError):
-            obj.micropath_construct('other', {})
+        result = obj.micropath_construct(other, {'a': 1, 'b': 2, 'c': 3})
+
+        assert result == other.return_value
+        other.assert_called_once_with(a=1, b=2, c=3)
 
     def test_micropath_bad_request(self, mocker):
         mock_HTTPBadRequest = mocker.patch.object(

@@ -945,7 +945,7 @@ class TestElement(object):
 
         result = obj.mount(delegation)
 
-        assert isinstance(result, elements.Delegation)
+        assert result == delegation
         assert result.element == obj
         assert obj.methods == {}
         assert obj._delegation == delegation
@@ -1145,20 +1145,37 @@ class TestRoot(object):
         mock_merge.assert_called_once_with(elem)
         elem.set_ident.assert_not_called()
 
-    def test_add_elem_no_ident(self, mocker):
+    def test_add_elem_path_no_ident(self, mocker):
         mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Path, ident=None)
         elem.parent = None
         obj = elements.Root()
         obj.bindings = {}
 
-        with pytest.raises(ValueError):
-            obj.add_elem(elem)
+        obj.add_elem(elem)
+
         assert obj.paths == {}
         assert obj.bindings == {}
         assert obj.methods == {}
         assert elem.ident is None
-        assert elem.parent is None
+        assert elem.parent is obj
+        mock_merge.assert_not_called()
+        elem.set_ident.assert_not_called()
+
+    def test_add_elem_binding_no_ident(self, mocker):
+        mock_merge = mocker.patch.object(elements.Root, 'merge')
+        elem = mocker.Mock(spec=elements.Binding, ident=None)
+        elem.parent = None
+        obj = elements.Root()
+        obj.bindings = {}
+
+        obj.add_elem(elem)
+
+        assert obj.paths == {}
+        assert obj.bindings == {}
+        assert obj.methods == {}
+        assert elem.ident is None
+        assert elem.parent is obj
         mock_merge.assert_not_called()
         elem.set_ident.assert_not_called()
 
@@ -1171,7 +1188,7 @@ class TestRoot(object):
 
         obj.add_elem(elem, 'spam')
 
-        assert obj.paths == {None: elem}
+        assert obj.paths == {}
         assert obj.bindings == {}
         assert obj.methods == {}
         assert elem.ident is None
@@ -1834,30 +1851,60 @@ class TestRoute(object):
 
 class TestMount(object):
     def test_base(self, mocker):
-        mock_Path = mocker.patch.object(elements, 'Path')
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            return_value=mocker.Mock(ident=None),
+        )
 
         result = elements.mount('delegation')
 
-        assert result == mock_Path.return_value.mount.return_value
-        mock_Path.assert_called_once_with(None)
-        mock_Path.return_value.mount.assert_called_once_with('delegation')
+        assert isinstance(result, elements.Delegation)
+        assert not hasattr(result, '_micropath_methods')
+        mock_init.assert_called_once_with('delegation', {})
+        mock_Method.assert_not_called()
 
-    def test_methods(self, mocker):
-        mock_Path = mocker.patch.object(elements, 'Path')
-
-        result = elements.mount('delegation', 'get', 'put')
-
-        assert result == mock_Path.return_value.mount.return_value
-        mock_Path.assert_called_once_with(None)
-        mock_Path.return_value.mount.assert_called_once_with(
-            'delegation', 'get', 'put',
+    def test_with_methods(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get', _delegation=None),
+            'put': mocker.Mock(ident='put', _delegation=None),
+        }
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f: methods[x],
         )
 
-    def test_ident(self, mocker):
-        mock_Path = mocker.patch.object(elements, 'Path')
+        result = elements.mount('delegation', 'get', 'put', a=1, b=2)
 
-        result = elements.mount('delegation', ident='ident')
+        assert isinstance(result, elements.Delegation)
+        assert result._micropath_methods == [methods['get'], methods['put']]
+        mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
+        mock_Method.assert_has_calls([
+            mocker.call('get', None),
+            mocker.call('put', None),
+        ])
 
-        assert result == mock_Path.return_value.mount.return_value
-        mock_Path.assert_called_once_with('ident')
-        mock_Path.return_value.mount.assert_called_once_with('delegation')
+    def test_delegation(self, mocker):
+        delegation = elements.Delegation('delegation', {})
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            return_value=mocker.Mock(ident=None),
+        )
+
+        result = elements.mount(delegation)
+
+        assert result == delegation
+        assert not hasattr(result, '_micropath_methods')
+        mock_init.assert_not_called()
+        mock_Method.assert_not_called()

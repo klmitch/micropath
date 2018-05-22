@@ -388,13 +388,11 @@ class Root(Element):
                 self.merge(elem)
                 return
             elif not isinstance(elem, Method) and not elem.ident:
-                # All elements must have idents
+                # Set the element's ident
                 if ident:
                     # It can now be set
                     elem.set_ident(ident)
                     ident = None
-                else:
-                    raise ValueError('Element missing ident')
 
             # Have we found the element to be added to the root?
             if not elem.parent:
@@ -405,9 +403,11 @@ class Root(Element):
 
         # We've found the element to be added to the root, so do so
         if isinstance(elem, Path):
-            self.paths[elem.ident] = elem
+            if elem.ident:
+                self.paths[elem.ident] = elem
         elif isinstance(elem, Binding):
-            self.bindings[elem.ident] = elem
+            if elem.ident:
+                self.bindings[elem.ident] = elem
         elif isinstance(elem, Method):
             self.methods[elem.ident] = elem
         else:
@@ -1236,25 +1236,34 @@ def mount(delegation, *methods, **kwargs):
     controller class; the default is to delegate all HTTP methods to
     the other controller.
 
+    Additional keyword arguments will be passed when creating a
+    ``Delegation``, which will subsequently pass them to the
+    controller's ``micropath_construct()`` method.
+
     :param delegation: Another controller to delegate to.  This may be
                        a ``micropath.Controller`` class (not
                        instance), or an instance of a specialized
                        subclass of ``Delegation``; the latter
                        possibility enables mounting other WSGI
                        applications, among other uses.
-    :param str ident: The identifier for the component.  This will be
-                      the expected value of the component.  May be
-                      ``None`` (the default) to indicate that the
-                      metaclass should set the value from the name of
-                      the class variable to which the element is
-                      assigned.  Note that this argument must be
-                      provided as a keyword argument.
 
-    :returns: The delegation to be mounted at this path element.
+    :returns: The delegation to be mounted at the root.
     :rtype: ``Delegation``
     """
 
-    # Construct a Path element and call its mount() method
-    return Path(kwargs.pop('ident', None)).mount(
-        delegation, *methods, **kwargs
-    )
+    # Wrap the delegation, if necessary
+    if not isinstance(delegation, Delegation):
+        delegation = Delegation(delegation, kwargs)
+
+    # If methods were specified, create them
+    if methods:
+        delegation._micropath_methods = []
+
+        for meth_str in methods:
+            meth = Method(meth_str, None)
+            delegation._micropath_methods.append(meth)
+
+            # Add the delegation to the Method
+            meth._delegation = delegation
+
+    return delegation
