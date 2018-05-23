@@ -816,6 +816,9 @@ class TestElement(object):
             elements, 'Method',
             return_value=mocker.Mock(ident=None),
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         obj = ElementForTest('ident')
         func = mocker.Mock(_micropath_handler=False)
 
@@ -823,6 +826,7 @@ class TestElement(object):
 
         assert result == func
         mock_Method.assert_called_once_with(None, func, parent=obj)
+        mock_from_func.assert_called_once_with(func)
         assert obj.methods == {None: mock_Method.return_value}
         assert func._micropath_handler is True
         assert func._micropath_elem is obj
@@ -832,6 +836,9 @@ class TestElement(object):
             elements, 'Method',
             return_value=mocker.Mock(ident=None),
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         obj = ElementForTest('ident')
         func = mocker.Mock(_micropath_handler=False)
 
@@ -840,12 +847,14 @@ class TestElement(object):
         assert callable(decorator)
         assert decorator != func
         mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
         assert obj.methods == {}
 
         result = decorator(func)
 
         assert result == func
         mock_Method.assert_called_once_with(None, func, parent=obj)
+        mock_from_func.assert_called_once_with(func)
         assert obj.methods == {None: mock_Method.return_value}
         assert func._micropath_handler is True
         assert func._micropath_elem is obj
@@ -859,6 +868,9 @@ class TestElement(object):
             elements, 'Method',
             side_effect=lambda x, f, parent: methods[x],
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         obj = ElementForTest('ident')
         func = mocker.Mock(_micropath_handler=False)
 
@@ -867,6 +879,7 @@ class TestElement(object):
         assert callable(decorator)
         assert decorator != func
         mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
         assert obj.methods == {}
 
         result = decorator(func)
@@ -877,6 +890,7 @@ class TestElement(object):
             mocker.call('put', func, parent=obj),
         ])
         assert mock_Method.call_count == 2
+        mock_from_func.assert_called_once_with(func)
         assert obj.methods == methods
         assert func._micropath_handler is True
         assert func._micropath_elem is obj
@@ -1351,21 +1365,29 @@ class TestBinding(object):
         assert obj.parent.bindings == {None: obj}
         mock_set_ident.assert_called_once_with('ident')
 
-    def test_validator_base(self):
+    def test_validator_base(self, mocker):
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         obj = elements.Binding('ident')
 
         result = obj.validator('func')
 
         assert result == 'func'
         assert obj._validator == 'func'
+        mock_from_func.assert_called_once_with('func')
 
-    def test_validator_already_set(self):
+    def test_validator_already_set(self, mocker):
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         obj = elements.Binding('ident')
         obj._validator = 'spam'
 
         with pytest.raises(ValueError):
             obj.validator('func')
         assert obj._validator == 'spam'
+        mock_from_func.assert_not_called()
 
     def test_validate_unset(self, mocker):
         inj = mocker.Mock()
@@ -1787,12 +1809,16 @@ class TestRoute(object):
             elements, 'Method',
             return_value=mocker.Mock(ident=None),
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         func = mocker.Mock(_micropath_methods=None, _micropath_handler=False)
 
         result = elements.route(func)
 
         assert result == func
         mock_Method.assert_called_once_with(None, func)
+        mock_from_func.assert_called_once_with(func)
         assert func._micropath_methods == [mock_Method.return_value]
         assert func._micropath_handler is True
 
@@ -1801,6 +1827,9 @@ class TestRoute(object):
             elements, 'Method',
             return_value=mocker.Mock(ident=None),
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         func = mocker.Mock(_micropath_methods=None, _micropath_handler=False)
 
         decorator = elements.route()
@@ -1808,6 +1837,7 @@ class TestRoute(object):
         assert callable(decorator)
         assert decorator != func
         mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
         assert func._micropath_methods is None
         assert func._micropath_handler is False
 
@@ -1815,6 +1845,7 @@ class TestRoute(object):
 
         assert result == func
         mock_Method.assert_called_once_with(None, func)
+        mock_from_func.assert_called_once_with(func)
         assert func._micropath_methods == [mock_Method.return_value]
         assert func._micropath_handler is True
 
@@ -1827,6 +1858,9 @@ class TestRoute(object):
             elements, 'Method',
             side_effect=lambda x, f: methods[x],
         )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
         func = mocker.Mock(_micropath_methods=None, _micropath_handler=False)
 
         decorator = elements.route('get', 'put')
@@ -1834,6 +1868,7 @@ class TestRoute(object):
         assert callable(decorator)
         assert decorator != func
         mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
         assert func._micropath_methods is None
         assert func._micropath_handler is False
 
@@ -1845,6 +1880,7 @@ class TestRoute(object):
             mocker.call('put', func),
         ])
         assert mock_Method.call_count == 2
+        mock_from_func.assert_called_once_with(func)
         assert func._micropath_methods == [methods[x] for x in ('get', 'put')]
         assert func._micropath_handler is True
 

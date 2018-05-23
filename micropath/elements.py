@@ -18,6 +18,8 @@ import functools
 
 import six
 
+from micropath import injector
+
 
 @six.add_metaclass(abc.ABCMeta)
 class Element(object):
@@ -241,6 +243,9 @@ class Element(object):
             # Mark the function as a handler and save its element
             func._micropath_handler = True
             func._micropath_elem = self
+
+            # Pre-compute its want signature
+            injector.WantSignature.from_func(func)
 
             return func
 
@@ -617,8 +622,13 @@ class Binding(Element):
         if self._validator:
             raise ValueError('validator has already been set')
 
-        # Save the validator and return the decorated function
+        # Save the validator
         self._validator = func
+
+        # Pre-compute its want signature
+        injector.WantSignature.from_func(func)
+
+        # Return the function
         return func
 
     def validate(self, obj, inj, value):
@@ -1216,6 +1226,9 @@ def route(*methods):
 
         # Mark the function as a handler
         func._micropath_handler = True
+
+        # Pre-compute its want signature
+        injector.WantSignature.from_func(func)
 
         return func
 
