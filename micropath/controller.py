@@ -309,50 +309,50 @@ class Controller(object):
         # Next, walk the path tree and invoke the handler; we use the
         # injector cleanup context manager to explicitly break
         # reference loops after we've dispatched to the handler method
-        try:
-            with req.injector.cleanup() as injector:
+        with req.injector.cleanup() as injector:
+            try:
+                # Add anything from the request's urlvars
+                injector.update(req.urlvars)
+
+                # Populate the request and root_controller fields of
+                # the injector
+                injector['request'] = req
+                injector['root_controller'] = self
+
+                # Add deferred accessors for all the other fields
+                def defer(key):
+                    # Can't use operator.attrgetter because we need
+                    # the parameter to be named "request"
+                    def get(request):
+                        return getattr(request, key)
+                    return get
+                for key, mapped in self.micropath_request_attrs.items():
+                    injector.set_deferred(key, defer(mapped or key))
+
+                # Hook for setting up additional injection settings
+                self.micropath_prepare_injector(req, injector)
+
+                resp = self._micropath_dispatch(req, injector)
+            except webob.exc.HTTPException as exc:
+                resp = exc
+            except Exception as exc:
+                # Some other error occurred; we'll turn it into an
+                # internal server error
                 try:
-                    # Add anything from the request's urlvars
-                    injector.update(req.urlvars)
-
-                    # Populate the request and root_controller fields of
-                    # the injector
-                    injector['request'] = req
-                    injector['root_controller'] = self
-
-                    # Add deferred accessors for all the other fields
-                    def defer(key):
-                        # Can't use operator.attrgetter because we need
-                        # the parameter to be named "request"
-                        def get(request):
-                            return getattr(request, key)
-                        return get
-                    for key, mapped in self.micropath_request_attrs.items():
-                        injector.set_deferred(key, defer(mapped or key))
-
-                    # Hook for setting up additional injection settings
-                    self.micropath_prepare_injector(req, injector)
-
-                    resp = self._micropath_dispatch(req, injector)
-                except webob.exc.HTTPException as exc:
-                    resp = exc
-                except Exception as exc:
-                    # Some other error occurred; we'll turn it into an
-                    # internal server error
                     resp = self.micropath_server_error(req, exc)
-        except Exception:
-            # An exception could be raised by
-            # micropath_server_error(); this clause acts as an
-            # absolute last resort to ensure that no exception makes
-            # it all the way up the stack.  Begin by formulating the
-            # detail for debugging purposes
-            detail = None
-            if self.micropath_debug:
-                # Debugging detail requested; format traceback
-                detail = traceback.format_exc()
+                except Exception:
+                    # An exception could be raised by
+                    # micropath_server_error(); this clause acts as an
+                    # absolute last resort to ensure that no exception
+                    # makes it all the way up the stack.  Begin by
+                    # formulating the detail for debugging purposes
+                    detail = None
+                    if self.micropath_debug:
+                        # Debugging detail requested; format traceback
+                        detail = traceback.format_exc()
 
-            # Construct the exception
-            resp = webob.exc.HTTPInternalServerError(detail)
+                    # Construct the exception
+                    resp = webob.exc.HTTPInternalServerError(detail)
 
         # Use the default response if none was returned
         if resp is None:
