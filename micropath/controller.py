@@ -12,6 +12,7 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
+import sys
 import traceback
 
 import six
@@ -335,11 +336,11 @@ class Controller(object):
                 resp = self._micropath_dispatch(req, injector)
             except webob.exc.HTTPException as exc:
                 resp = exc
-            except Exception as exc:
+            except Exception:
                 # Some other error occurred; we'll turn it into an
                 # internal server error
                 try:
-                    resp = self.micropath_server_error(req, exc)
+                    resp = self.micropath_server_error(req, sys.exc_info())
                 except Exception:
                     # An exception could be raised by
                     # micropath_server_error(); this clause acts as an
@@ -386,12 +387,7 @@ class Controller(object):
                     it, and will be used to invoke the handler method.
         :type inj: ``micropath.injector.Injector``
 
-        :returns: The result of invoking the handler method.  If the
-                  handler method raises an exception, that exception
-                  will be converted into a ``webob.response.Response``
-                  object (typically by calling the
-                  ``micropath_server_error()`` hook method) and
-                  returned.
+        :returns: The result of invoking the handler method.
         """
 
         # Resolve the path to a Path or Binding
@@ -593,8 +589,9 @@ class Controller(object):
 
         :param request: The request that caused the error to be
                         raised.
-        :param cause: The exception that caused this method to be
-                      called.
+        :param cause: The exception tuple for the exception that
+                      caused this method to be called.  This will be
+                      the tuple from ``sys.exc_info()``.
 
         :returns: An appropriate response.  The default implementation
                   returns a bare

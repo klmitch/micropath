@@ -140,6 +140,9 @@ class TestController(object):
             controller.Controller, '_micropath_dispatch',
         )
         base_resp = mock_micropath_dispatch.return_value
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
+        )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
         )
@@ -162,6 +165,7 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
+        mock_exc_info.assert_not_called()
         mock_micropath_server_error.assert_not_called()
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_not_called()
@@ -183,6 +187,9 @@ class TestController(object):
             controller.Controller, '_micropath_dispatch',
             return_value=None,
         )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
+        )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
         )
@@ -205,6 +212,7 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
+        mock_exc_info.assert_not_called()
         mock_micropath_server_error.assert_not_called()
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_not_called()
@@ -226,6 +234,9 @@ class TestController(object):
             controller.Controller, '_micropath_dispatch',
             return_value=u'this\u2026is a test',
         )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
+        )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
         )
@@ -248,6 +259,7 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
+        mock_exc_info.assert_not_called()
         mock_micropath_server_error.assert_not_called()
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_called_once_with(
@@ -271,6 +283,9 @@ class TestController(object):
             controller.Controller, '_micropath_dispatch',
             return_value=b'this\xe2\x80\xa6is a test',
         )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
+        )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
         )
@@ -293,6 +308,7 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
+        mock_exc_info.assert_not_called()
         mock_micropath_server_error.assert_not_called()
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_called_once_with(
@@ -317,6 +333,9 @@ class TestController(object):
             controller.Controller, '_micropath_dispatch',
             side_effect=exc,
         )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
+        )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
         )
@@ -339,6 +358,7 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
+        mock_exc_info.assert_not_called()
         mock_micropath_server_error.assert_not_called()
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_not_called()
@@ -356,10 +376,12 @@ class TestController(object):
         mock_micropath_prepare_injector = mocker.patch.object(
             controller.Controller, 'micropath_prepare_injector',
         )
-        exc = ExceptionForTest('test')
         mock_micropath_dispatch = mocker.patch.object(
             controller.Controller, '_micropath_dispatch',
-            side_effect=exc,
+            side_effect=ExceptionForTest('test'),
+        )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
         )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
@@ -383,7 +405,10 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
-        mock_micropath_server_error.assert_called_once_with(req, exc)
+        mock_exc_info.assert_called_once_with()
+        mock_micropath_server_error.assert_called_once_with(
+            req, mock_exc_info.return_value,
+        )
         base_resp = mock_micropath_server_error.return_value
         mock_HTTPInternalServerError.assert_not_called()
         req.response.write.assert_not_called()
@@ -401,14 +426,16 @@ class TestController(object):
         mock_micropath_prepare_injector = mocker.patch.object(
             controller.Controller, 'micropath_prepare_injector',
         )
-        exc = ExceptionForTest('test')
         mock_micropath_dispatch = mocker.patch.object(
             controller.Controller, '_micropath_dispatch',
-            side_effect=exc,
+            side_effect=ExceptionForTest('test'),
+        )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
         )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
-            side_effect=exc,
+            side_effect=ExceptionForTest('test'),
         )
         mocker.patch.object(
             controller.traceback, 'format_exc',
@@ -429,7 +456,10 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
-        mock_micropath_server_error.assert_called_once_with(req, exc)
+        mock_exc_info.assert_called_once_with()
+        mock_micropath_server_error.assert_called_once_with(
+            req, mock_exc_info.return_value,
+        )
         mock_HTTPInternalServerError.assert_called_once_with(None)
         base_resp = mock_HTTPInternalServerError.return_value
         req.response.write.assert_not_called()
@@ -451,6 +481,9 @@ class TestController(object):
         mock_micropath_dispatch = mocker.patch.object(
             controller.Controller, '_micropath_dispatch',
             side_effect=exc,
+        )
+        mock_exc_info = mocker.patch.object(
+            controller.sys, 'exc_info',
         )
         mock_micropath_server_error = mocker.patch.object(
             controller.Controller, 'micropath_server_error',
@@ -476,7 +509,10 @@ class TestController(object):
         req.injector.cleanup.assert_called_once_with()
         mock_micropath_prepare_injector.assert_called_once_with(req, inj)
         mock_micropath_dispatch.assert_called_once_with(req, inj)
-        mock_micropath_server_error.assert_called_once_with(req, exc)
+        mock_exc_info.assert_called_once_with()
+        mock_micropath_server_error.assert_called_once_with(
+            req, mock_exc_info.return_value,
+        )
         mock_HTTPInternalServerError.assert_called_once_with('exception')
         base_resp = mock_HTTPInternalServerError.return_value
         req.response.write.assert_not_called()
