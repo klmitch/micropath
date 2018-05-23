@@ -489,9 +489,6 @@ class TestController(object):
             controller.injector, 'wants',
             return_value=False,
         )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
-        )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
         )
@@ -525,7 +522,6 @@ class TestController(object):
 
         assert result == inj.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_not_called()
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -538,9 +534,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=True,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -575,7 +568,6 @@ class TestController(object):
 
         assert result == inj.return_value
         mock_wants.assert_called_once_with('func', 'path_info')
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_not_called()
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -588,9 +580,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -625,7 +614,6 @@ class TestController(object):
 
         assert result == mock_micropath_not_found.return_value
         mock_wants.assert_called_once_with('func', 'path_info')
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_called_once_with(req, 'path_info')
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -638,9 +626,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -677,7 +662,6 @@ class TestController(object):
 
         assert result == delegation_obj._micropath_dispatch.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_not_called()
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -692,9 +676,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -729,7 +710,6 @@ class TestController(object):
 
         assert result == mock_micropath_options.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_not_called()
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_called_once_with(
@@ -744,9 +724,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -781,7 +758,6 @@ class TestController(object):
 
         assert result == mock_micropath_not_found.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_called_once_with(req, 'path_info')
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -794,9 +770,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -831,7 +804,6 @@ class TestController(object):
 
         assert result == mock_micropath_not_implemented.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_not_called()
         mock_micropath_not_implemented.assert_called_once_with(req, 'GET')
         mock_micropath_options.assert_not_called()
@@ -844,9 +816,6 @@ class TestController(object):
         mock_wants = mocker.patch.object(
             controller.injector, 'wants',
             return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
         )
         mock_micropath_not_found = mocker.patch.object(
             controller.Controller, 'micropath_not_found',
@@ -881,7 +850,6 @@ class TestController(object):
 
         assert result == mock_micropath_not_found.return_value
         mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
         mock_micropath_not_found.assert_called_once_with(req, 'path_info')
         mock_micropath_not_implemented.assert_not_called()
         mock_micropath_options.assert_not_called()
@@ -889,208 +857,6 @@ class TestController(object):
         mock_micropath_delegation.assert_called_once_with(req, elem)
         mock_micropath_methods.assert_not_called()
         inj.assert_not_called()
-
-    def test_micropath_dispatch_resolve_httpexception(self, mocker):
-        mock_wants = mocker.patch.object(
-            controller.injector, 'wants',
-            return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
-        )
-        mock_micropath_not_found = mocker.patch.object(
-            controller.Controller, 'micropath_not_found',
-        )
-        mock_micropath_not_implemented = mocker.patch.object(
-            controller.Controller, 'micropath_not_implemented',
-        )
-        mock_micropath_options = mocker.patch.object(
-            controller.Controller, 'micropath_options',
-        )
-        exc = webob.exc.HTTPException('spam', 'wsgi_response')
-        mock_micropath_resolve = mocker.patch.object(
-            controller.Controller, '_micropath_resolve',
-            side_effect=exc,
-        )
-        mock_micropath_delegation = mocker.patch.object(
-            controller.Controller, '_micropath_delegation',
-            return_value=('func', None),
-        )
-        mock_micropath_methods = mocker.patch.object(
-            controller.Controller, '_micropath_methods',
-            return_value=set(['HEAD', 'GET', 'POST']),
-        )
-        req = mocker.Mock(
-            path_info='path_info',
-            method='GET',
-        )
-        inj = mocker.Mock()
-        obj = controller.Controller()
-
-        result = obj._micropath_dispatch(req, inj)
-
-        assert result == exc
-        mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
-        mock_micropath_not_found.assert_not_called()
-        mock_micropath_not_implemented.assert_not_called()
-        mock_micropath_options.assert_not_called()
-        mock_micropath_resolve.assert_called_once_with(req, inj)
-        mock_micropath_delegation.assert_not_called()
-        mock_micropath_methods.assert_not_called()
-        inj.assert_not_called()
-
-    def test_micropath_dispatch_resolve_exceptionfortest(self, mocker):
-        mock_wants = mocker.patch.object(
-            controller.injector, 'wants',
-            return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
-        )
-        mock_micropath_not_found = mocker.patch.object(
-            controller.Controller, 'micropath_not_found',
-        )
-        mock_micropath_not_implemented = mocker.patch.object(
-            controller.Controller, 'micropath_not_implemented',
-        )
-        mock_micropath_options = mocker.patch.object(
-            controller.Controller, 'micropath_options',
-        )
-        exc = ExceptionForTest('spam')
-        mock_micropath_resolve = mocker.patch.object(
-            controller.Controller, '_micropath_resolve',
-            side_effect=exc,
-        )
-        mock_micropath_delegation = mocker.patch.object(
-            controller.Controller, '_micropath_delegation',
-            return_value=('func', None),
-        )
-        mock_micropath_methods = mocker.patch.object(
-            controller.Controller, '_micropath_methods',
-            return_value=set(['HEAD', 'GET', 'POST']),
-        )
-        req = mocker.Mock(
-            path_info='path_info',
-            method='GET',
-        )
-        inj = mocker.Mock()
-        obj = controller.Controller()
-
-        result = obj._micropath_dispatch(req, inj)
-
-        assert result == mock_micropath_server_error.return_value
-        mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_called_once_with(req, exc)
-        mock_micropath_not_found.assert_not_called()
-        mock_micropath_not_implemented.assert_not_called()
-        mock_micropath_options.assert_not_called()
-        mock_micropath_resolve.assert_called_once_with(req, inj)
-        mock_micropath_delegation.assert_not_called()
-        mock_micropath_methods.assert_not_called()
-        inj.assert_not_called()
-
-    def test_micropath_dispatch_call_func_httpexception(self, mocker):
-        mock_wants = mocker.patch.object(
-            controller.injector, 'wants',
-            return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
-        )
-        mock_micropath_not_found = mocker.patch.object(
-            controller.Controller, 'micropath_not_found',
-        )
-        mock_micropath_not_implemented = mocker.patch.object(
-            controller.Controller, 'micropath_not_implemented',
-        )
-        mock_micropath_options = mocker.patch.object(
-            controller.Controller, 'micropath_options',
-        )
-        elem = mocker.Mock(methods={})
-        mock_micropath_resolve = mocker.patch.object(
-            controller.Controller, '_micropath_resolve',
-            return_value=(elem, False),
-        )
-        mock_micropath_delegation = mocker.patch.object(
-            controller.Controller, '_micropath_delegation',
-            return_value=('func', None),
-        )
-        mock_micropath_methods = mocker.patch.object(
-            controller.Controller, '_micropath_methods',
-            return_value=set(['HEAD', 'GET', 'POST']),
-        )
-        req = mocker.Mock(
-            path_info='path_info',
-            method='GET',
-        )
-        exc = webob.exc.HTTPException('spam', 'wsgi_response')
-        inj = mocker.Mock(side_effect=exc)
-        obj = controller.Controller()
-
-        result = obj._micropath_dispatch(req, inj)
-
-        assert result == exc
-        mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_not_called()
-        mock_micropath_not_found.assert_not_called()
-        mock_micropath_not_implemented.assert_not_called()
-        mock_micropath_options.assert_not_called()
-        mock_micropath_resolve.assert_called_once_with(req, inj)
-        mock_micropath_delegation.assert_called_once_with(req, elem)
-        mock_micropath_methods.assert_not_called()
-        inj.assert_called_once_with('func', obj)
-
-    def test_micropath_dispatch_call_func_exceptionfortest(self, mocker):
-        mock_wants = mocker.patch.object(
-            controller.injector, 'wants',
-            return_value=False,
-        )
-        mock_micropath_server_error = mocker.patch.object(
-            controller.Controller, 'micropath_server_error',
-        )
-        mock_micropath_not_found = mocker.patch.object(
-            controller.Controller, 'micropath_not_found',
-        )
-        mock_micropath_not_implemented = mocker.patch.object(
-            controller.Controller, 'micropath_not_implemented',
-        )
-        mock_micropath_options = mocker.patch.object(
-            controller.Controller, 'micropath_options',
-        )
-        elem = mocker.Mock(methods={})
-        mock_micropath_resolve = mocker.patch.object(
-            controller.Controller, '_micropath_resolve',
-            return_value=(elem, False),
-        )
-        mock_micropath_delegation = mocker.patch.object(
-            controller.Controller, '_micropath_delegation',
-            return_value=('func', None),
-        )
-        mock_micropath_methods = mocker.patch.object(
-            controller.Controller, '_micropath_methods',
-            return_value=set(['HEAD', 'GET', 'POST']),
-        )
-        req = mocker.Mock(
-            path_info='path_info',
-            method='GET',
-        )
-        exc = ExceptionForTest('spam')
-        inj = mocker.Mock(side_effect=exc)
-        obj = controller.Controller()
-
-        result = obj._micropath_dispatch(req, inj)
-
-        assert result == mock_micropath_server_error.return_value
-        mock_wants.assert_not_called()
-        mock_micropath_server_error.assert_called_once_with(req, exc)
-        mock_micropath_not_found.assert_not_called()
-        mock_micropath_not_implemented.assert_not_called()
-        mock_micropath_options.assert_not_called()
-        mock_micropath_resolve.assert_called_once_with(req, inj)
-        mock_micropath_delegation.assert_called_once_with(req, elem)
-        mock_micropath_methods.assert_not_called()
-        inj.assert_called_once_with('func', obj)
 
     def test_micropath_resolve_base(self, mocker):
         elems = {

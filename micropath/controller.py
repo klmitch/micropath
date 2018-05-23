@@ -338,9 +338,7 @@ class Controller(object):
                     resp = exc
                 except Exception as exc:
                     # Some other error occurred; we'll turn it into an
-                    # internal server error.  This is here as a last resort;
-                    # these exceptions should be caught and handled by
-                    # _micropath_dispatch()
+                    # internal server error
                     resp = self.micropath_server_error(req, exc)
         except Exception:
             # An exception could be raised by
@@ -397,14 +395,7 @@ class Controller(object):
         """
 
         # Resolve the path to a Path or Binding
-        try:
-            elem, path_info_required = self._micropath_resolve(req, inj)
-        except webob.exc.HTTPException as exc:
-            return exc
-        except Exception as exc:
-            # Some other error occurred; we'll turn it into an
-            # internal server error.
-            return self.micropath_server_error(req, exc)
+        elem, path_info_required = self._micropath_resolve(req, inj)
 
         # Get the matching function and delegation
         func, delegation = self._micropath_delegation(req, elem)
@@ -412,14 +403,7 @@ class Controller(object):
         # First, is there a function?
         if (func and
                 (not path_info_required or injector.wants(func, 'path_info'))):
-            try:
-                return inj(func, self)
-            except webob.exc.HTTPException as exc:
-                return exc
-            except Exception as exc:
-                # Some other error occurred; we'll turn it into an
-                # internal server error.
-                return self.micropath_server_error(req, exc)
+            return inj(func, self)
 
         # OK, delegate if needed
         if delegation:
