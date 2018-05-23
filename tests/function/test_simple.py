@@ -255,6 +255,16 @@ class TestSimple(object):
 
         assert status == '501 Not Implemented'
 
+    def test_subscriber_not_found(self):
+        controller = SubscriberController()
+
+        status, _headers, _body = utils.invoke(
+            controller, '/1234/not_found',
+            method='GET',
+        )
+
+        assert status == '404 Not Found'
+
     def test_book_index(self):
         controller = SubscriberController()
 
