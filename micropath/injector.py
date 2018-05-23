@@ -343,15 +343,15 @@ class InjectorCleanup(object):
 
         return self.injector
 
-    def __exit__(self, exc_value, exc_type, exc_tb):
+    def __exit__(self, exc_type, exc_value, exc_tb):
         """
         Exit the context manager.  This deletes all keys added to the
         injector since the context manager was entered.  The
         exception, if any, is not handled.
 
-        :param exc_value: The exception that was raised, or ``None``.
         :param exc_type: The type of the exception that was raised, or
                          ``None``.
+        :param exc_value: The exception that was raised, or ``None``.
         :param exc_tb: The traceback of the exception that was raised,
                        or ``None``.
 
