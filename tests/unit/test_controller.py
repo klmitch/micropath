@@ -1104,16 +1104,40 @@ class TestController(object):
         assert result == other.return_value
         other.assert_called_once_with(a=1, b=2, c=3)
 
-    def test_micropath_server_error(self, mocker):
+    def test_micropath_server_error_base(self, mocker):
+        mock_format_exception = mocker.patch.object(
+            controller.traceback, 'format_exception',
+            return_value=['line1\n', 'line2\n', 'line3\n'],
+        )
         mock_HTTPInternalServerError = mocker.patch.object(
             controller.webob.exc, 'HTTPInternalServerError',
         )
         obj = controller.Controller()
 
-        result = obj.micropath_server_error('req', 'cause')
+        result = obj.micropath_server_error('req', ('type', 'value', 'tb'))
 
         assert result == mock_HTTPInternalServerError.return_value
-        mock_HTTPInternalServerError.assert_called_once_with()
+        mock_format_exception.assert_not_called()
+        mock_HTTPInternalServerError.assert_called_once_with(None)
+
+    def test_micropath_server_error_debug(self, mocker):
+        mock_format_exception = mocker.patch.object(
+            controller.traceback, 'format_exception',
+            return_value=['line1\n', 'line2\n', 'line3\n'],
+        )
+        mock_HTTPInternalServerError = mocker.patch.object(
+            controller.webob.exc, 'HTTPInternalServerError',
+        )
+        obj = controller.Controller()
+        obj.micropath_debug = True
+
+        result = obj.micropath_server_error('req', ('type', 'value', 'tb'))
+
+        assert result == mock_HTTPInternalServerError.return_value
+        mock_format_exception.assert_called_once_with('type', 'value', 'tb')
+        mock_HTTPInternalServerError.assert_called_once_with(
+            'line1\nline2\nline3\n',
+        )
 
     def test_micropath_not_found(self, mocker):
         mock_HTTPNotFound = mocker.patch.object(

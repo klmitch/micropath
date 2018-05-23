@@ -595,13 +595,22 @@ class Controller(object):
 
         :returns: An appropriate response.  The default implementation
                   returns a bare
-                  ``webob.exc.HTTPInternalServerError``.  Note that,
-                  for security reasons, the text of the ``cause`` is
-                  *not* included: some exception text may include
-                  sensitive data, such as paths.
+                  ``webob.exc.HTTPInternalServerError``, including
+                  traceback information only if ``micropath_debug`` is
+                  set to ``True``.  NOTE THAT, FOR SECURITY REASONS,
+                  THE TRACEBACK SHOULD *NOT* BE INCLUDED ON PRODUCTION
+                  SYSTEMS: THIS INFORMATION MAY INCLUDE SENSITIVE
+                  DATA, SUCH AS PATHS.
         """
 
-        return webob.exc.HTTPInternalServerError()
+        # Formulate the detail for debugging purposes
+        detail = None
+        if self.micropath_debug:
+            # Debugging detail requested; format traceback
+            detail = ''.join(traceback.format_exception(*cause))
+
+        # Construct and return the exception
+        return webob.exc.HTTPInternalServerError(detail)
 
     def micropath_not_found(self, request, path_info):
         """
