@@ -116,11 +116,10 @@ class Controller(object):
         ``False``.  This may be shadowed by an instance attribute of
         the same name to enable debugging responses; this will include
         traceback and debugging information in the 500 error generated
-        if the ``micropath_bad_request()`` or
-        ``micropath_server_error()`` hook methods raise an exception.
-        WARNING: THIS ATTRIBUTE MUST NOT BE SET TO ``True`` ON
-        PRODUCTION SERVERS!  Exception information can leak
-        security-sensitive data to callers.
+        if the ``micropath_server_error()`` hook method raises an
+        exception.  WARNING: THIS ATTRIBUTE MUST NOT BE SET TO
+        ``True`` ON PRODUCTION SERVERS!  Exception information can
+        leak security-sensitive data to callers.
     * ``micropath_request_attrs`` - A dictionary of request attributes
         that may be injected into handler methods.  The keys of this
         dictionary are the parameter names the handler methods may
@@ -153,25 +152,14 @@ class Controller(object):
         dependency injector has been initialized.  This can be used to
         add additional fields to the dependency injector.  Only the
         implementation in the root ``Controller`` subclass is useful.
-    * ``micropath_bad_request()`` - Called if a handler method or the
-        injector raises a ``ValueError``.  This can happen prior to
-        calling the handler method if one of the attributes to be
-        injected into the handler is malformed in some fashion.  The
-        default implementation returns a bare
-        ``webob.exc.HTTPBadRequest``, which causes a 400 error to be
-        returned to the HTTP client.  This must be implemented in each
-        ``Controller`` subclass, so if customizing this hook, it is
-        recommended to create a base class with the desired
-        implementation, then subclass that.
     * ``micropath_server_error()`` - Called if a handler method or the
         injector raises any exception that is not
-        ``webob.exc.HTTPException`` or ``ValueError``.  The default
-        implementation returns a bare
-        ``webob.exc.HTTPInternalServerError``, which causes a 500
-        error to be returned to the HTTP client.  This must be
-        implemented in each ``Controller`` subclass, so if customizing
-        this hook, it is recommended to create a base class with the
-        desired implementation, then subclass that.
+        ``webob.exc.HTTPException``.  The default implementation
+        returns a bare ``webob.exc.HTTPInternalServerError``, which
+        causes a 500 error to be returned to the HTTP client.  This
+        must be implemented in each ``Controller`` subclass, so if
+        customizing this hook, it is recommended to create a base
+        class with the desired implementation, then subclass that.
     * ``micropath_not_found()`` - Called if the path could not be
         resolved.  Note that this will not be called for a given
         request if the handler function for that URL and HTTP method
@@ -348,11 +336,6 @@ class Controller(object):
                     resp = self._micropath_dispatch(req, injector)
                 except webob.exc.HTTPException as exc:
                     resp = exc
-                except ValueError as exc:
-                    # Some error occurred; we'll turn it into a bad request
-                    # error.  This is here as a last resort; these exceptions
-                    # should be caught and handled by _micropath_dispatch()
-                    resp = self.micropath_bad_request(req, exc)
                 except Exception as exc:
                     # Some other error occurred; we'll turn it into an
                     # internal server error.  This is here as a last resort;
@@ -360,8 +343,8 @@ class Controller(object):
                     # _micropath_dispatch()
                     resp = self.micropath_server_error(req, exc)
         except Exception:
-            # An exception could be raised by micropath_bad_request()
-            # or micropath_server_error(); this clause acts as an
+            # An exception could be raised by
+            # micropath_server_error(); this clause acts as an
             # absolute last resort to ensure that no exception makes
             # it all the way up the stack.  Begin by formulating the
             # detail for debugging purposes
@@ -409,8 +392,7 @@ class Controller(object):
                   handler method raises an exception, that exception
                   will be converted into a ``webob.response.Response``
                   object (typically by calling the
-                  ``micropath_bad_request()`` or
-                  ``micropath_server_error()`` hook methods) and
+                  ``micropath_server_error()`` hook method) and
                   returned.
         """
 
@@ -419,10 +401,6 @@ class Controller(object):
             elem, path_info_required = self._micropath_resolve(req, inj)
         except webob.exc.HTTPException as exc:
             return exc
-        except ValueError as exc:
-            # Some error occurred; we'll turn it into a bad request
-            # error.
-            return self.micropath_bad_request(req, exc)
         except Exception as exc:
             # Some other error occurred; we'll turn it into an
             # internal server error.
@@ -438,10 +416,6 @@ class Controller(object):
                 return inj(func, self)
             except webob.exc.HTTPException as exc:
                 return exc
-            except ValueError as exc:
-                # Some error occurred; we'll turn it into a bad
-                # request error.
-                return self.micropath_bad_request(req, exc)
             except Exception as exc:
                 # Some other error occurred; we'll turn it into an
                 # internal server error.
@@ -626,27 +600,6 @@ class Controller(object):
         """
 
         pass  # pragma: no cover
-
-    def micropath_bad_request(self, request, cause):
-        """
-        A hook method for handling the case that a ``ValueError`` was
-        raised during request processing.  This usually happens
-        because some field to be injected into a handler method was
-        malformed.
-
-        :param request: The request that caused the error to be
-                        raised.
-        :param cause: The ``ValueError`` exception that caused this
-                      method to be called.
-
-        :returns: An appropriate response.  The default implementation
-                  returns a bare ``webob.exc.HTTPBadRequest``.  Note
-                  that, for security reasons, the text of the
-                  ``cause`` is *not* included: some exception text may
-                  include sensitive data, such as paths.
-        """
-
-        return webob.exc.HTTPBadRequest()
 
     def micropath_server_error(self, request, cause):
         """
