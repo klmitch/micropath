@@ -12,6 +12,7 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
+import pytest
 import webob.exc
 
 from micropath import controller
@@ -104,7 +105,7 @@ class TestController(object):
         for deleg in delegations:
             deleg.get.assert_called_once_with(result)
 
-    def check_injector(self, obj, req, mocker, **kwargs):
+    def check_injector(self, obj, req, mocker, mock_exc_info, **kwargs):
         injector = req.injector.cleanup.return_value.__enter__.return_value
         injector.update.assert_called_once_with(kwargs)
         injector.__setitem__.assert_has_calls([
@@ -113,13 +114,32 @@ class TestController(object):
         ])
         assert injector.__setitem__.call_count == 2
 
+        mock_micropath_request_error = mocker.patch.object(
+            obj, 'micropath_request_error',
+            return_value=ExceptionForTest(),
+        )
         keys = set()
         for pos, _kw in injector.set_deferred.call_args_list:
+            # Get the call arguments
             key = pos[0]
             func = pos[1]
-            assert func(req) == getattr(
-                req, controller.Controller.micropath_request_attrs[key] or key,
+            real_key = (
+                controller.Controller.micropath_request_attrs[key] or key
             )
+
+            # Check what happens when the function is called
+            assert func(req) == getattr(req, real_key)
+
+            # Check what happens if the attribute doesn't exist
+            delattr(req, real_key)
+            with pytest.raises(ExceptionForTest):
+                func(req)
+            mock_micropath_request_error.assert_called_once_with(
+                req, real_key, mock_exc_info.return_value,
+            )
+            mock_micropath_request_error.reset_mock()
+
+            # We've tested for this key
             keys.add(pos[0])
 
         assert keys == set(controller.Controller.micropath_request_attrs)
@@ -169,7 +189,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_return_none(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -216,7 +236,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_return_text(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -265,7 +285,7 @@ class TestController(object):
         )
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_return_bytes(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -314,7 +334,7 @@ class TestController(object):
         )
         req.response.merge_cookies.assert_not_called()
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_http_exception(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -362,7 +382,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(exc)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_exceptionfortest(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -412,7 +432,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_last_resort_exception(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -463,7 +483,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_call_last_resort_exception_debug(self, mocker):
         req = mocker.MagicMock(charset='utf-8', urlvars={'a': 1})
@@ -516,7 +536,7 @@ class TestController(object):
         req.response.write.assert_not_called()
         req.response.merge_cookies.assert_called_once_with(base_resp)
         resp.assert_called_once_with('environ', 'start_response')
-        self.check_injector(obj, req, mocker, a=1)
+        self.check_injector(obj, req, mocker, mock_exc_info, a=1)
 
     def test_micropath_dispatch_call_func(self, mocker):
         mock_wants = mocker.patch.object(
@@ -1167,6 +1187,45 @@ class TestController(object):
         mock_format_exception.assert_called_once_with('type', 'value', 'tb')
         mock_HTTPInternalServerError.assert_called_once_with(
             'line1\nline2\nline3\n',
+        )
+
+    def test_micropath_request_error_base(self, mocker):
+        mock_format_exception = mocker.patch.object(
+            controller.traceback, 'format_exception',
+            return_value=['line1\n', 'line2\n', 'line3\n'],
+        )
+        mock_HTTPBadRequest = mocker.patch.object(
+            controller.webob.exc, 'HTTPBadRequest',
+        )
+        obj = controller.Controller()
+
+        result = obj.micropath_request_error(
+            'req', 'key', ('type', 'value', 'tb'),
+        )
+
+        assert result == mock_HTTPBadRequest.return_value
+        mock_format_exception.assert_not_called()
+        mock_HTTPBadRequest.assert_called_once_with(None)
+
+    def test_micropath_request_error_debug(self, mocker):
+        mock_format_exception = mocker.patch.object(
+            controller.traceback, 'format_exception',
+            return_value=['line1\n', 'line2\n', 'line3\n'],
+        )
+        mock_HTTPBadRequest = mocker.patch.object(
+            controller.webob.exc, 'HTTPBadRequest',
+        )
+        obj = controller.Controller()
+        obj.micropath_debug = True
+
+        result = obj.micropath_request_error(
+            'req', 'key', ('type', 'value', 'tb'),
+        )
+
+        assert result == mock_HTTPBadRequest.return_value
+        mock_format_exception.assert_called_once_with('type', 'value', 'tb')
+        mock_HTTPBadRequest.assert_called_once_with(
+            'Accessing request attribute "key":\nline1\nline2\nline3\n',
         )
 
     def test_micropath_not_found(self, mocker):

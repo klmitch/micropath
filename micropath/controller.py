@@ -325,7 +325,12 @@ class Controller(object):
                     # Can't use operator.attrgetter because we need
                     # the parameter to be named "request"
                     def get(request):
-                        return getattr(request, key)
+                        try:
+                            return getattr(request, key)
+                        except Exception:
+                            raise self.micropath_request_error(
+                                request, key, sys.exc_info(),
+                            )
                     return get
                 for key, mapped in self.micropath_request_attrs.items():
                     injector.set_deferred(key, defer(mapped or key))
@@ -607,6 +612,45 @@ class Controller(object):
 
         # Construct and return the exception
         return webob.exc.HTTPInternalServerError(detail)
+
+    def micropath_request_error(self, request, attr, cause):
+        """
+        A hook method for handling the case that an exception that was not
+        a ``webob.exc.HTTPException`` was raised while injecting a
+        request attribute.  This might occur if a JSON payload was not
+        valid JSON, for instance.
+
+        :param request: The request that caused the error to be
+                        raised.
+        :param str attr: The name of the attribute that could not be
+                         accessed.
+        :param cause: The exception tuple for the exception that
+                      caused this method to be called.  This will be
+                      the tuple from ``sys.exc_info()``.
+
+        :returns: An appropriate response.  The default implementation
+                  returns a bare ``webob.exc.HTTPBadRequest``,
+                  including traceback information only if
+                  ``micropath_debug`` is set to ``True``.  NOTE THAT,
+                  FOR SECURITY REASONS, THE TRACEBACK SHOULD *NOT* BE
+                  INCLUDED ON PRODUCTION SYSTEMS: THIS INFORMATION MAY
+                  INCLUDE SENSITIVE DATA, SUCH AS PATHS.  Also note
+                  that the return value of this function MUST be an
+                  object extending ``Exception``, such as
+                  ``webob.exc.HTTPBadRequest``; the value will be
+                  passed to ``raise``.
+        """
+
+        # Formulate the detail for debugging purposes
+        detail = None
+        if self.micropath_debug:
+            # Debugging detail requested; format traceback
+            detail = 'Accessing request attribute "%s":\n%s' % (
+                attr, ''.join(traceback.format_exception(*cause)),
+            )
+
+        # Construct and return the exception
+        return webob.exc.HTTPBadRequest(detail)
 
     def micropath_not_found(self, request, path_info):
         """
