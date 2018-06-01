@@ -454,27 +454,23 @@ class Controller(object):
             # If it's a static path, we'll go down that branch
             if path_elem in elem.paths:
                 elem = elem.paths[path_elem]
-            else:
-                # Try matching against bindings
-                for name, binding in elem.bindings.items():
-                    try:
-                        value = binding.validate(self, inj, path_elem)
-                    except elements.SkipBinding:
-                        continue
-                    break
-                else:
-                    # Didn't match against any of the bindings
+            elif elem.bindings is not None:
+                try:
+                    value = elem.bindings.validate(self, inj, path_elem)
+                except elements.SkipBinding:
                     break
 
                 # Save it into the injector and the urlvars
-                if name not in inj:
+                if elem.bindings.ident not in inj:
                     # Only add to the injector if there are no
                     # conflicts
-                    inj[name] = value
-                req.urlvars[name] = value
+                    inj[elem.bindings.ident] = value
+                req.urlvars[elem.bindings.ident] = value
 
                 # Set the next element
-                elem = binding
+                elem = elem.bindings
+            else:
+                break
 
             # OK, pop off the path element and set up for the next one
             req.path_info_pop()

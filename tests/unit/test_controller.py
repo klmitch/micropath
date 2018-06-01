@@ -12,8 +12,6 @@
 # implied. See the License for the specific language governing
 # permissions and limitations under the License.
 
-import collections
-
 import webob.exc
 
 from micropath import controller
@@ -896,25 +894,25 @@ class TestController(object):
 
     def test_micropath_resolve_base(self, mocker):
         elems = {
-            None: mocker.Mock(t_paths=['a'], t_bindings=[], skip=False),
-            'a': mocker.Mock(t_paths=[], t_bindings=['b', 'c'], skip=False),
-            'b': mocker.Mock(t_paths=[], t_bindings=[], skip=True),
-            'c': mocker.Mock(t_paths=['d'], t_bindings=[], skip=False),
-            'd': mocker.Mock(t_paths=[], t_bindings=['e'], skip=False),
-            'e': mocker.Mock(t_paths=[], t_bindings=[], skip=False),
+            None: mocker.Mock(t_paths=['a'], t_bindings=None, skip=False),
+            'a': mocker.Mock(t_paths=[], t_bindings='b', skip=False),
+            'b': mocker.Mock(t_paths=['c'], t_bindings=None, skip=False),
+            'c': mocker.Mock(t_paths=[], t_bindings='d', skip=False),
+            'd': mocker.Mock(t_paths=[], t_bindings=None, skip=False),
         }
-        for elem in elems.values():
+        for name, elem in elems.items():
+            elem.ident = name
             if elem.skip:
                 elem.validate.side_effect = elements.SkipBinding()
             elem.paths = {x: elems[x] for x in elem.t_paths}
-            elem.bindings = collections.OrderedDict(
-                (x, elems[x]) for x in elem.t_bindings
+            elem.bindings = (
+                None if elem.t_bindings is None else elems[elem.t_bindings]
             )
         mocker.patch.object(
             controller.Controller, '_micropath_root', elems[None],
         )
         req = mocker.Mock(**{
-            'path_info_peek.side_effect': ['a', '1', 'd', '2', ''],
+            'path_info_peek.side_effect': ['a', '1', 'c', '2', ''],
             'urlvars': {},
         })
         inj = {}
@@ -922,79 +920,77 @@ class TestController(object):
 
         result = obj._micropath_resolve(req, inj)
 
-        assert result == (elems['e'], False)
+        assert result == (elems['d'], False)
         url_vars = {
-            'c': elems['c'].validate.return_value,
-            'e': elems['e'].validate.return_value,
+            'b': elems['b'].validate.return_value,
+            'd': elems['d'].validate.return_value,
         }
         assert inj == url_vars
         assert req.urlvars == url_vars
         elems['b'].validate.assert_called_once_with(obj, inj, '1')
-        elems['c'].validate.assert_called_once_with(obj, inj, '1')
-        elems['e'].validate.assert_called_once_with(obj, inj, '2')
+        elems['d'].validate.assert_called_once_with(obj, inj, '2')
 
     def test_micropath_resolve_injector_conflict(self, mocker):
         elems = {
-            None: mocker.Mock(t_paths=['a'], t_bindings=[], skip=False),
-            'a': mocker.Mock(t_paths=[], t_bindings=['b', 'c'], skip=False),
-            'b': mocker.Mock(t_paths=[], t_bindings=[], skip=True),
-            'c': mocker.Mock(t_paths=['d'], t_bindings=[], skip=False),
-            'd': mocker.Mock(t_paths=[], t_bindings=['e'], skip=False),
-            'e': mocker.Mock(t_paths=[], t_bindings=[], skip=False),
+            None: mocker.Mock(t_paths=['a'], t_bindings=None, skip=False),
+            'a': mocker.Mock(t_paths=[], t_bindings='b', skip=False),
+            'b': mocker.Mock(t_paths=['c'], t_bindings=None, skip=False),
+            'c': mocker.Mock(t_paths=[], t_bindings='d', skip=False),
+            'd': mocker.Mock(t_paths=[], t_bindings=None, skip=False),
         }
-        for elem in elems.values():
+        for name, elem in elems.items():
+            elem.ident = name
             if elem.skip:
                 elem.validate.side_effect = elements.SkipBinding()
             elem.paths = {x: elems[x] for x in elem.t_paths}
-            elem.bindings = collections.OrderedDict(
-                (x, elems[x]) for x in elem.t_bindings
+            elem.bindings = (
+                None if elem.t_bindings is None else elems[elem.t_bindings]
             )
         mocker.patch.object(
             controller.Controller, '_micropath_root', elems[None],
         )
         req = mocker.Mock(**{
-            'path_info_peek.side_effect': ['a', '1', 'd', '2', ''],
+            'path_info_peek.side_effect': ['a', '1', 'c', '2', ''],
             'urlvars': {},
         })
-        inj = {'e': 'x'}
+        inj = {'d': 'x'}
         obj = controller.Controller()
 
         result = obj._micropath_resolve(req, inj)
 
-        assert result == (elems['e'], False)
+        assert result == (elems['d'], False)
         assert inj == {
-            'c': elems['c'].validate.return_value,
-            'e': 'x',
+            'b': elems['b'].validate.return_value,
+            'd': 'x',
         }
         assert req.urlvars == {
-            'c': elems['c'].validate.return_value,
-            'e': elems['e'].validate.return_value,
+            'b': elems['b'].validate.return_value,
+            'd': elems['d'].validate.return_value,
         }
         elems['b'].validate.assert_called_once_with(obj, inj, '1')
-        elems['c'].validate.assert_called_once_with(obj, inj, '1')
-        elems['e'].validate.assert_called_once_with(obj, inj, '2')
+        elems['d'].validate.assert_called_once_with(obj, inj, '2')
 
-    def test_micropath_resolve_nomatch(self, mocker):
+    def test_micropath_resolve_skip_last(self, mocker):
         elems = {
-            None: mocker.Mock(t_paths=['a'], t_bindings=[], skip=False),
-            'a': mocker.Mock(t_paths=[], t_bindings=['b', 'c'], skip=False),
-            'b': mocker.Mock(t_paths=[], t_bindings=[], skip=True),
-            'c': mocker.Mock(t_paths=['d'], t_bindings=[], skip=False),
-            'd': mocker.Mock(t_paths=[], t_bindings=['e'], skip=False),
-            'e': mocker.Mock(t_paths=[], t_bindings=[], skip=True),
+            None: mocker.Mock(t_paths=['a'], t_bindings=None, skip=False),
+            'a': mocker.Mock(t_paths=[], t_bindings='b', skip=False),
+            'b': mocker.Mock(t_paths=['c'], t_bindings=None, skip=False),
+            'c': mocker.Mock(t_paths=[], t_bindings='d', skip=False),
+            'd': mocker.Mock(t_paths=[], t_bindings=None, skip=True),
         }
-        for elem in elems.values():
+        for name, elem in elems.items():
+            elem.ident = name
             if elem.skip:
                 elem.validate.side_effect = elements.SkipBinding()
             elem.paths = {x: elems[x] for x in elem.t_paths}
-            elem.bindings = collections.OrderedDict(
-                (x, elems[x]) for x in elem.t_bindings
+            elem.bindings = (
+                None if elem.t_bindings is None else elems[elem.t_bindings]
             )
         mocker.patch.object(
             controller.Controller, '_micropath_root', elems[None],
         )
         req = mocker.Mock(**{
-            'path_info_peek.side_effect': ['a', '1', 'd', '2', ''],
+            'path_info_peek.side_effect': ['a', '1', 'c', '2', ''],
             'urlvars': {},
         })
         inj = {}
@@ -1002,15 +998,49 @@ class TestController(object):
 
         result = obj._micropath_resolve(req, inj)
 
-        assert result == (elems['d'], True)
+        assert result == (elems['c'], True)
         url_vars = {
-            'c': elems['c'].validate.return_value,
+            'b': elems['b'].validate.return_value,
         }
         assert inj == url_vars
         assert req.urlvars == url_vars
         elems['b'].validate.assert_called_once_with(obj, inj, '1')
-        elems['c'].validate.assert_called_once_with(obj, inj, '1')
-        elems['e'].validate.assert_called_once_with(obj, inj, '2')
+        elems['d'].validate.assert_called_once_with(obj, inj, '2')
+
+    def test_micropath_resolve_unmatched(self, mocker):
+        elems = {
+            None: mocker.Mock(t_paths=['a'], t_bindings=None, skip=False),
+            'a': mocker.Mock(t_paths=[], t_bindings='b', skip=False),
+            'b': mocker.Mock(t_paths=['c'], t_bindings=None, skip=False),
+            'c': mocker.Mock(t_paths=[], t_bindings=None, skip=False),
+        }
+        for name, elem in elems.items():
+            elem.ident = name
+            if elem.skip:
+                elem.validate.side_effect = elements.SkipBinding()
+            elem.paths = {x: elems[x] for x in elem.t_paths}
+            elem.bindings = (
+                None if elem.t_bindings is None else elems[elem.t_bindings]
+            )
+        mocker.patch.object(
+            controller.Controller, '_micropath_root', elems[None],
+        )
+        req = mocker.Mock(**{
+            'path_info_peek.side_effect': ['a', '1', 'c', '2', ''],
+            'urlvars': {},
+        })
+        inj = {}
+        obj = controller.Controller()
+
+        result = obj._micropath_resolve(req, inj)
+
+        assert result == (elems['c'], True)
+        url_vars = {
+            'b': elems['b'].validate.return_value,
+        }
+        assert inj == url_vars
+        assert req.urlvars == url_vars
+        elems['b'].validate.assert_called_once_with(obj, inj, '1')
 
     def test_micropath_delegation_base(self, mocker):
         req = mocker.Mock(method='GET')

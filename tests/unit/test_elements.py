@@ -34,7 +34,7 @@ class TestElement(object):
         assert result.ident == 'ident'
         assert result.parent is None
         assert result.paths == {}
-        assert result.bindings == {}
+        assert result.bindings is None
         assert result.methods == {}
         assert result.delegation is None
 
@@ -44,7 +44,7 @@ class TestElement(object):
         assert result.ident == 'ident'
         assert result.parent == 'parent'
         assert result.paths == {}
-        assert result.bindings == {}
+        assert result.bindings is None
         assert result.methods == {}
         assert result.delegation is None
 
@@ -119,7 +119,7 @@ class TestElement(object):
             None,
             parent=obj,
         )
-        assert obj.bindings == {}
+        assert obj.bindings is None
 
     def test_binding_with_ident(self, mocker):
         mock_Binding = mocker.patch.object(
@@ -135,7 +135,7 @@ class TestElement(object):
             'spam',
             parent=obj,
         )
-        assert obj.bindings == {'spam': result}
+        assert obj.bindings == result
 
     def test_binding_conflict(self, mocker):
         mock_Binding = mocker.patch.object(
@@ -143,7 +143,7 @@ class TestElement(object):
             return_value=mocker.Mock(ident='spam'),
         )
         obj = ElementForTest('ident')
-        obj.bindings['spam'] = 'conflict'
+        obj.bindings = 'conflict'
 
         with pytest.raises(ValueError):
             obj.bind('spam')
@@ -151,7 +151,7 @@ class TestElement(object):
             'spam',
             parent=obj,
         )
-        assert obj.bindings == {'spam': 'conflict'}
+        assert obj.bindings == 'conflict'
 
     def test_route_func(self, mocker):
         mock_Method = mocker.patch.object(
@@ -466,7 +466,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {'spam': elem}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
@@ -481,7 +481,7 @@ class TestRoot(object):
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {'spam': 'conflict'}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is None
@@ -495,7 +495,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {}
-        assert obj.bindings == {'spam': elem}
+        assert obj.bindings == elem
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
@@ -505,12 +505,12 @@ class TestRoot(object):
         elem = mocker.Mock(spec=elements.Binding, ident='spam')
         elem.parent = None
         obj = elements.Root()
-        obj.bindings['spam'] = 'conflict'
+        obj.bindings = 'conflict'
 
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {}
-        assert obj.bindings == {'spam': 'conflict'}
+        assert obj.bindings == 'conflict'
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is None
@@ -524,7 +524,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {'spam': elem}
         assert elem.ident == 'spam'
         assert elem.parent is obj
@@ -539,7 +539,7 @@ class TestRoot(object):
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {'spam': 'conflict'}
         assert elem.ident == 'spam'
         assert elem.parent is None
@@ -553,7 +553,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {None: elem}
         assert elem.ident is None
         assert elem.parent is obj
@@ -568,7 +568,7 @@ class TestRoot(object):
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {None: 'conflict'}
         assert elem.ident is None
         assert elem.parent is None
@@ -582,7 +582,7 @@ class TestRoot(object):
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is None
@@ -594,7 +594,7 @@ class TestRoot(object):
         obj.add_elem(obj)
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
 
     def test_add_elem_root(self, mocker):
@@ -605,7 +605,7 @@ class TestRoot(object):
         with pytest.raises(ValueError):
             obj.add_elem(elem)
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is None
@@ -619,7 +619,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
@@ -633,7 +633,7 @@ class TestRoot(object):
         obj.add_elem(elem)
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
@@ -647,7 +647,7 @@ class TestRoot(object):
         obj.add_elem(elem, 'spam')
 
         assert obj.paths == {}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
@@ -663,7 +663,7 @@ class TestRoot(object):
         obj.add_elem(descendant, 'descendant')
 
         assert obj.paths == {'spam': elem}
-        assert obj.bindings == {}
+        assert obj.bindings is None
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
@@ -804,21 +804,21 @@ class TestBinding(object):
     def test_set_ident_with_parent(self, mocker):
         mock_set_ident = mocker.patch.object(elements.Element, 'set_ident')
         obj = elements.Binding(None)
-        obj.parent = mocker.Mock(bindings={})
+        obj.parent = mocker.Mock(bindings=None)
 
         obj.set_ident('ident')
 
-        assert obj.parent.bindings == {None: obj}
+        assert obj.parent.bindings == obj
         mock_set_ident.assert_called_once_with('ident')
 
     def test_set_ident_conflict(self, mocker):
         mock_set_ident = mocker.patch.object(elements.Element, 'set_ident')
         obj = elements.Binding(None)
-        obj.parent = mocker.Mock(bindings={None: 'conflict'})
+        obj.parent = mocker.Mock(bindings='conflict')
 
         with pytest.raises(ValueError):
             obj.set_ident('ident')
-        assert obj.parent.bindings == {None: 'conflict'}
+        assert obj.parent.bindings == 'conflict'
         mock_set_ident.assert_called_once_with('ident')
 
     def test_validator_base(self, mocker):

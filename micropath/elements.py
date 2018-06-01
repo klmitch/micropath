@@ -48,7 +48,7 @@ class Element(object):
 
         # Set up subordinate lists
         self.paths = {}
-        self.bindings = {}
+        self.bindings = None
         self.methods = {}
 
         # For delegation to other controllers
@@ -130,11 +130,11 @@ class Element(object):
 
         # If it has an identifier, add it to the lists
         if elem.ident:
-            if elem.ident in self.bindings:
+            if self.bindings is not None:
                 raise ValueError(
                     'Binding element for "%s" already exists' % elem.ident,
                 )
-            self.bindings[elem.ident] = elem
+            self.bindings = elem
 
         return elem
 
@@ -345,11 +345,11 @@ class Root(Element):
                 self.paths[elem.ident] = elem
         elif isinstance(elem, Binding):
             if elem.ident:
-                if elem.ident in self.bindings:
+                if self.bindings is not None:
                     raise ValueError(
                         'Binding element for "%s" already exists' % elem.ident,
                     )
-                self.bindings[elem.ident] = elem
+                self.bindings = elem
         elif isinstance(elem, Method):
             if elem.ident in self.methods:
                 raise ValueError(
@@ -524,11 +524,11 @@ class Binding(Element):
         super(Binding, self).set_ident(ident)
 
         if self.parent:
-            if self.ident in self.parent.bindings:
+            if self.parent.bindings is not None:
                 raise ValueError(
                     'Binding element for "%s" already exists' % self.ident,
                 )
-            self.parent.bindings[self.ident] = self
+            self.parent.bindings = self
 
     def validator(self, func):
         """
