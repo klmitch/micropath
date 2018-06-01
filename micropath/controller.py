@@ -14,6 +14,7 @@
 
 import sys
 import traceback
+from wsgiref import simple_server
 
 import six
 import webob.dec
@@ -701,3 +702,25 @@ class Controller(object):
         """
 
         return webob.exc.HTTPNoContent(headers={'Allow': ','.join(methods)})
+
+    def micropath_run(self, host='', port=8000):
+        """
+        Serve the application.  This makes use of the Python standard
+        library ``wsgiref`` package's ``simple_server`` to present the
+        application defined in this controller as a WSGI server.
+
+        Note: It is NOT RECOMMENDED to use this method to serve an
+        application for production purposes.  No attempt is made to
+        handle threading, error handling, SSL, or a host of other
+        issues that real, production-ready HTTP and WSGI servers
+        handle.  This method is provided for testing purposes only.
+
+        :param str host: The IP address for the server to listen on.
+                         Defaults to the empty string, meaning to
+                         listen on all interfaces.
+        :param int port: The port for the server to listen on.
+                         Defaults to 8000.
+        """
+
+        server = simple_server.make_server(host, port, self)
+        server.serve_forever()

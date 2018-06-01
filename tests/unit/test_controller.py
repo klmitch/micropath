@@ -1262,3 +1262,27 @@ class TestController(object):
         mock_HTTPNoContent.assert_called_once_with(
             headers={'Allow': 'GET,HEAD,POST'},
         )
+
+    def test_micropath_run_base(self, mocker):
+        mock_make_server = mocker.patch.object(
+            controller.simple_server, 'make_server',
+        )
+        server = mock_make_server.return_value
+        obj = controller.Controller()
+
+        obj.micropath_run()
+
+        mock_make_server.assert_called_once_with('', 8000, obj)
+        server.serve_forever.assert_called_once_with()
+
+    def test_micropath_run_alt(self, mocker):
+        mock_make_server = mocker.patch.object(
+            controller.simple_server, 'make_server',
+        )
+        server = mock_make_server.return_value
+        obj = controller.Controller()
+
+        obj.micropath_run('127.0.0.1', 5000)
+
+        mock_make_server.assert_called_once_with('127.0.0.1', 5000, obj)
+        server.serve_forever.assert_called_once_with()
