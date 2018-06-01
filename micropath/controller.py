@@ -586,8 +586,8 @@ class Controller(object):
     def micropath_server_error(self, request, cause):
         """
         A hook method for handling the case that an exception that was not
-        a ``ValueError`` or ``webob.exc.HTTPException`` was raised during
-        request processing.
+        a ``webob.exc.HTTPException`` was raised during request
+        processing.
 
         :param request: The request that caused the error to be
                         raised.
