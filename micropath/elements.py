@@ -13,7 +13,6 @@
 # permissions and limitations under the License.
 
 import abc
-import collections
 import functools
 
 import six
@@ -48,15 +47,12 @@ class Element(object):
         self.parent = parent
 
         # Set up subordinate lists
-        self.paths = MergingMap()
-        self.bindings = MergingMap()
-        self.methods = MergingMap()
+        self.paths = {}
+        self.bindings = {}
+        self.methods = {}
 
         # For delegation to other controllers
-        self._delegation = None
-
-        # Allows merging multiple elements into one
-        self._master = None
+        self.delegation = None
 
     @abc.abstractmethod
     def set_ident(self, ident):
@@ -84,88 +80,6 @@ class Element(object):
         # Set the identifier
         self.ident = ident
 
-    def merge(self, other):
-        """
-        Merge this element into another element.  This element will
-        contain all subordinate elements of the other element, and
-        those elements will be updated to have this element as their
-        parent.  The other element will be updated to reference this
-        element as well.
-
-        :param other: The other element to merge.  Must be a
-                      descendant of this element class.
-        :type other: ``Element``
-        """
-
-        # If we're not the master, delegate to the master
-        if self._master:
-            self._master.merge(other)
-            return
-
-        # Only allow appropriate subclasses
-        if not isinstance(other, self.__class__):
-            raise ValueError(
-                'cannot merge "%s.%s" and "%s.%s"' % (
-                    self.__class__.__module__, self.__class__.__name__,
-                    other.__class__.__module__, other.__class__.__name__,
-                )
-            )
-
-        # Validate idents
-        if self.ident != other.ident:
-            raise ValueError(
-                'cannot merge with unequal idents "%s" and "%s"' %
-                (self.ident, other.ident)
-            )
-
-        # Catch conflicting delegations
-        if (self._delegation and other.delegation and
-                self._delegation is not other.delegation):
-            raise ValueError('cannot merge due to conflicting delegations')
-
-        # Merge parents
-        if self.parent and other.parent:
-            if self.parent is not other.parent:
-                # Merging parents will also merge subordinates
-                self.parent.merge(other.parent)
-                return
-        elif self.parent or other.parent:
-            raise ValueError(
-                'cannot merge elements at different places in the tree'
-            )
-
-        # Walk the other's chain of masters
-        while other._master:
-            next_master = other._master
-            # Repoint the other's master at ours
-            other._master = self._master or self
-            other = next_master
-
-        # Merge the subordinate lists
-        for self_sub, other_sub in [
-                (self.paths, other.paths),
-                (self.bindings, other.bindings),
-                (self.methods, other.methods),
-        ]:
-            for elem in other_sub.values():
-                self_sub[elem.ident] = elem
-
-                # Update the element's parent
-                elem.parent = self
-
-        # Make the other element a proxy for this one
-        other.paths = self.paths
-        other.bindings = self.bindings
-        other.methods = self.methods
-
-        # Set the delegation
-        if other._delegation:
-            self._delegation = other._delegation
-        other._delegation = None
-
-        # Finally, set ourself as the master
-        other._master = self._master or self
-
     def path(self, ident=None):
         """
         Construct a new subordinate ``Path`` element.
@@ -187,6 +101,10 @@ class Element(object):
 
         # If it has an identifier, add it to the lists
         if elem.ident:
+            if elem.ident in self.paths:
+                raise ValueError(
+                    'Path element for "%s" already exists' % elem.ident,
+                )
             self.paths[elem.ident] = elem
 
         return elem
@@ -212,6 +130,10 @@ class Element(object):
 
         # If it has an identifier, add it to the lists
         if elem.ident:
+            if elem.ident in self.bindings:
+                raise ValueError(
+                    'Binding element for "%s" already exists' % elem.ident,
+                )
             self.bindings[elem.ident] = elem
 
         return elem
@@ -234,6 +156,8 @@ class Element(object):
             # Construct the new Method objects
             if methods:
                 for meth_str in methods:
+                    if meth_str in self.methods:
+                        continue
                     meth = Method(meth_str, func, parent=self)
                     self.methods[meth.ident] = meth
             else:
@@ -254,6 +178,14 @@ class Element(object):
             func = methods[0]
             methods = ()
             return decorator(func)
+
+        # Check for duplicate idents
+        dups = [meth_str for meth_str in methods if meth_str in self.methods]
+        if dups:
+            raise ValueError(
+                'Method element(s) for "%s" already exist(s)' %
+                '", "'.join(sorted(dups)),
+            )
 
         return decorator
 
@@ -283,12 +215,8 @@ class Element(object):
             The delegation has already been set.
         """
 
-        # Delegate to the master
-        if self._master:
-            return self._master.mount(delegation, *methods, **kwargs)
-
         # Make sure the delegation hasn't already been set
-        if self._delegation:
+        if self.delegation:
             raise ValueError('delegation has already been set')
 
         # Wrap the delegation, if necessary
@@ -301,25 +229,28 @@ class Element(object):
 
         # Set the delegation
         if methods:
+            # Check for duplicate idents
+            dups = [
+                meth_str for meth_str in methods if meth_str in self.methods
+            ]
+            if dups:
+                raise ValueError(
+                    'Method element(s) for "%s" already exist(s)' %
+                    '", "'.join(sorted(dups)),
+                )
+
             # Method restrictions specified, so apply them
             for meth_str in methods:
+                if meth_str in self.methods:
+                    continue
                 meth = Method(meth_str, None, parent=self)
                 self.methods[meth.ident] = meth
-                meth._delegation = delegation
+                meth.delegation = delegation
         else:
             # Delegation on us
-            self._delegation = delegation
+            self.delegation = delegation
 
         return delegation
-
-    @property
-    def delegation(self):
-        """
-        Retrieve the delegation.
-        """
-
-        # Defer to the master if necessary
-        return self._master.delegation if self._master else self._delegation
 
 
 class Root(Element):
@@ -389,9 +320,7 @@ class Root(Element):
                 # Guess it's already been added to us
                 return
             elif isinstance(elem, Root):
-                # Merge root elements
-                self.merge(elem)
-                return
+                raise ValueError('Cannot add a Root element to a Root element')
             elif not isinstance(elem, Method) and not elem.ident:
                 # Set the element's ident
                 if ident:
@@ -409,11 +338,23 @@ class Root(Element):
         # We've found the element to be added to the root, so do so
         if isinstance(elem, Path):
             if elem.ident:
+                if elem.ident in self.paths:
+                    raise ValueError(
+                        'Path element for "%s" already exists' % elem.ident,
+                    )
                 self.paths[elem.ident] = elem
         elif isinstance(elem, Binding):
             if elem.ident:
+                if elem.ident in self.bindings:
+                    raise ValueError(
+                        'Binding element for "%s" already exists' % elem.ident,
+                    )
                 self.bindings[elem.ident] = elem
         elif isinstance(elem, Method):
+            if elem.ident in self.methods:
+                raise ValueError(
+                    'Method element for "%s" already exists' % elem.ident,
+                )
             self.methods[elem.ident] = elem
         else:
             raise ValueError(
@@ -451,6 +392,10 @@ class Path(Element):
         super(Path, self).set_ident(ident)
 
         if self.parent:
+            if self.ident in self.parent.paths:
+                raise ValueError(
+                    'Path element for "%s" already exists' % self.ident,
+                )
             self.parent.paths[self.ident] = self
 
 
@@ -579,6 +524,10 @@ class Binding(Element):
         super(Binding, self).set_ident(ident)
 
         if self.parent:
+            if self.ident in self.parent.bindings:
+                raise ValueError(
+                    'Binding element for "%s" already exists' % self.ident,
+                )
             self.parent.bindings[self.ident] = self
 
     def validator(self, func):
@@ -818,95 +767,6 @@ class Method(Element):
         return super(Method, self).mount(delegation, **kwargs)
 
 
-class MergingMap(collections.MutableMapping):
-    """
-    Represents a dictionary to which items can be added, but once
-    added they cannot be changed or deleted.  This is used to provide
-    additional error detection for subordinate path element
-    components.
-    """
-
-    def __init__(self):
-        """
-        Initialize an ``MergingMap`` instance.
-        """
-
-        # Initialize the map
-        self._map = {}
-
-    def __len__(self):
-        """
-        Retrieve the size of the map.
-
-        :returns: The number of items in the map.
-        :rtype: ``int``
-        """
-
-        return len(self._map)
-
-    def __iter__(self):
-        """
-        Iterate over the keys in the map.
-
-        :returns: An iterator of map keys.
-        """
-
-        return iter(self._map)
-
-    def __getitem__(self, key):
-        """
-        Retrieve the item with a given identifier.
-
-        :param str key: The identifier of the element.
-
-        :returns: The specified element.
-        :rtype: ``Element``
-
-        :raises KeyError:
-            The specified element is not set in the map.
-        """
-
-        return self._map[key]
-
-    def __setitem__(self, key, value):
-        """
-        Set the element with a given identifier.
-
-        :param str key: The identifier of the element.
-        :param value: The element.
-        :type value: ``Element``
-        """
-
-        # Sanity-check the value
-        assert key == value.ident
-
-        if key in self._map:
-            # Key exists; merge the elements
-            self._map[key].merge(value)
-        else:
-            # Set the value
-            self._map[key] = value
-
-    def __delitem__(self, key):
-        """
-        Delete the element with a given identifier.
-
-        :param str key: The identifier of the element.
-
-        :raises ValueError:
-            Keys cannot be deleted once set.
-
-        :raises KeyError:
-            The key is not present in the mapping.
-        """
-
-        # Don't allow modifications
-        if key in self._map:
-            raise ValueError('key "%s" cannot be removed from map' % key)
-
-        raise KeyError(key)
-
-
 class Delegation(object):
     """
     Default delegation for controller classes.  Implements the
@@ -1080,8 +940,13 @@ def route(*methods):
         meth_list = []
 
         # Construct the new Method objects
+        seen = set()
         if methods:
             for meth_str in methods:
+                if meth_str in seen:
+                    continue
+                seen.add(meth_str)
+
                 meth = Method(meth_str, func)
                 meth_list.append(meth)
         else:
@@ -1140,11 +1005,16 @@ def mount(delegation, *methods, **kwargs):
     if methods:
         delegation._micropath_methods = []
 
+        seen = set()
         for meth_str in methods:
+            if meth_str in seen:
+                continue
+            seen.add(meth_str)
+
             meth = Method(meth_str, None)
             delegation._micropath_methods.append(meth)
 
             # Add the delegation to the Method
-            meth._delegation = delegation
+            meth.delegation = delegation
 
     return delegation

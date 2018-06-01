@@ -33,28 +33,20 @@ class TestElement(object):
 
         assert result.ident == 'ident'
         assert result.parent is None
-        assert isinstance(result.paths, elements.MergingMap)
         assert result.paths == {}
-        assert isinstance(result.bindings, elements.MergingMap)
         assert result.bindings == {}
-        assert isinstance(result.methods, elements.MergingMap)
         assert result.methods == {}
-        assert result._delegation is None
-        assert result._master is None
+        assert result.delegation is None
 
     def test_init_alt(self):
         result = ElementForTest('ident', 'parent')
 
         assert result.ident == 'ident'
         assert result.parent == 'parent'
-        assert isinstance(result.paths, elements.MergingMap)
         assert result.paths == {}
-        assert isinstance(result.bindings, elements.MergingMap)
         assert result.bindings == {}
-        assert isinstance(result.methods, elements.MergingMap)
         assert result.methods == {}
-        assert result._delegation is None
-        assert result._master is None
+        assert result.delegation is None
 
     def test_set_ident_base(self):
         obj = ElementForTest(None)
@@ -73,679 +65,6 @@ class TestElement(object):
     @staticmethod
     def sub_sel(subs, *elems):
         return {elem: subs[elem] for elem in elems}
-
-    def test_merge_base(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_obj_not_master(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1._master = mocker.Mock()
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj2._master is None
-        obj1._master.merge.assert_called_once_with(obj2)
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_walk_master_chain(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        obj3 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-        obj3._master = obj2
-
-        obj1.merge(obj3)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        assert obj3._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_telescope_delegation(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-        obj2._delegation = 'delegation'
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation == 'delegation'
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_keep_delegation(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj1._delegation = 'delegation'
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation == 'delegation'
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_identical_delegation(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        delegation = mocker.Mock()
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj1._delegation = delegation
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-        obj2._delegation = delegation
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation is delegation
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_bad_types(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = OtherElement('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        with pytest.raises(ValueError):
-            obj1.merge(obj2)
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_conflicting_ident(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('spam')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        with pytest.raises(ValueError):
-            obj1.merge(obj2)
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_conflicting_delegation(self, mocker):
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident')
-        delegation1 = mocker.Mock()
-        delegation2 = mocker.Mock()
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj1._delegation = delegation1
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-        obj2._delegation = delegation2
-
-        with pytest.raises(ValueError):
-            obj1.merge(obj2)
-        assert obj1.parent is None
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is delegation1
-        assert obj2._delegation is delegation2
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-
-    def test_merge_parent2_none(self, mocker):
-        parent1 = mocker.Mock()
-        obj1 = ElementForTest('ident', parent1)
-        obj2 = ElementForTest('ident')
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        with pytest.raises(ValueError):
-            obj1.merge(obj2)
-        assert obj1.parent is parent1
-        assert obj2.parent is None
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-        parent1.merge.assert_not_called()
-
-    def test_merge_parent1_none(self, mocker):
-        parent2 = mocker.Mock()
-        obj1 = ElementForTest('ident')
-        obj2 = ElementForTest('ident', parent2)
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        with pytest.raises(ValueError):
-            obj1.merge(obj2)
-        assert obj1.parent is None
-        assert obj2.parent is parent2
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-        parent2.merge.assert_not_called()
-
-    def test_merge_different_parents(self, mocker):
-        parent1 = mocker.Mock()
-        parent2 = mocker.Mock()
-        obj1 = ElementForTest('ident', parent1)
-        obj2 = ElementForTest('ident', parent2)
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj2),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj2),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is parent1
-        assert obj2.parent is parent2
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2',
-        )
-        assert obj2.paths is not obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2',
-        )
-        assert obj2.bindings is not obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2',
-        )
-        assert obj2.methods is not obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is None
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-        parent1.merge.assert_called_once_with(parent2)
-        parent2.merge.assert_not_called()
-
-    def test_merge_identical_parents(self, mocker):
-        parent = mocker.Mock()
-        obj1 = ElementForTest('ident', parent)
-        obj2 = ElementForTest('ident', parent)
-        subordinates = {
-            'o1p1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1p2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1b2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m1': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o1m2': mocker.Mock(pre_parent=obj1, expected=obj1),
-            'o2p1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2p2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2b2': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m1': mocker.Mock(pre_parent=obj2, expected=obj1),
-            'o2m2': mocker.Mock(pre_parent=obj2, expected=obj1),
-        }
-        for ident, sub in subordinates.items():
-            sub.ident = ident
-            sub.parent = sub.pre_parent
-        obj1.paths = self.sub_sel(subordinates, 'o1p1', 'o1p2')
-        obj1.bindings = self.sub_sel(subordinates, 'o1b1', 'o1b2')
-        obj1.methods = self.sub_sel(subordinates, 'o1m1', 'o1m2')
-        obj2.paths = self.sub_sel(subordinates, 'o2p1', 'o2p2')
-        obj2.bindings = self.sub_sel(subordinates, 'o2b1', 'o2b2')
-        obj2.methods = self.sub_sel(subordinates, 'o2m1', 'o2m2')
-
-        obj1.merge(obj2)
-
-        assert obj1.parent is parent
-        assert obj2.parent is parent
-        assert obj1.paths == self.sub_sel(
-            subordinates, 'o1p1', 'o1p2', 'o2p1', 'o2p2',
-        )
-        assert obj2.paths is obj1.paths
-        assert obj1.bindings == self.sub_sel(
-            subordinates, 'o1b1', 'o1b2', 'o2b1', 'o2b2',
-        )
-        assert obj2.bindings is obj1.bindings
-        assert obj1.methods == self.sub_sel(
-            subordinates, 'o1m1', 'o1m2', 'o2m1', 'o2m2',
-        )
-        assert obj2.methods is obj1.methods
-        assert obj1._delegation is None
-        assert obj2._delegation is None
-        assert obj1._master is None
-        assert obj2._master is obj1
-        for sub in subordinates.values():
-            assert sub.parent is sub.expected
-        parent.merge.assert_not_called()
 
     def test_path_base(self, mocker):
         mock_Path = mocker.patch.object(
@@ -773,13 +92,25 @@ class TestElement(object):
         mock_Path.assert_called_once_with('spam', parent=obj)
         assert obj.paths == {'spam': result}
 
+    def test_path_conflict(self, mocker):
+        mock_Path = mocker.patch.object(
+            elements, 'Path',
+            return_value=mocker.Mock(ident='spam'),
+        )
+        obj = ElementForTest('ident')
+        obj.paths['spam'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.path('spam')
+        mock_Path.assert_called_once_with('spam', parent=obj)
+        assert obj.paths == {'spam': 'conflict'}
+
     def test_binding_base(self, mocker):
         mock_Binding = mocker.patch.object(
             elements, 'Binding',
             return_value=mocker.Mock(ident=None),
         )
         obj = ElementForTest('ident')
-        obj.bindings = {}
 
         result = obj.bind()
 
@@ -790,13 +121,12 @@ class TestElement(object):
         )
         assert obj.bindings == {}
 
-    def test_binding_alt(self, mocker):
+    def test_binding_with_ident(self, mocker):
         mock_Binding = mocker.patch.object(
             elements, 'Binding',
             return_value=mocker.Mock(ident='spam'),
         )
         obj = ElementForTest('ident')
-        obj.bindings = {}
 
         result = obj.bind('spam')
 
@@ -806,6 +136,22 @@ class TestElement(object):
             parent=obj,
         )
         assert obj.bindings == {'spam': result}
+
+    def test_binding_conflict(self, mocker):
+        mock_Binding = mocker.patch.object(
+            elements, 'Binding',
+            return_value=mocker.Mock(ident='spam'),
+        )
+        obj = ElementForTest('ident')
+        obj.bindings['spam'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.bind('spam')
+        mock_Binding.assert_called_once_with(
+            'spam',
+            parent=obj,
+        )
+        assert obj.bindings == {'spam': 'conflict'}
 
     def test_route_func(self, mocker):
         mock_Method = mocker.patch.object(
@@ -891,6 +237,63 @@ class TestElement(object):
         assert func._micropath_handler is True
         assert func._micropath_elem is obj
 
+    def test_route_with_methods_internal_duplicate(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get'),
+            'put': mocker.Mock(ident='put'),
+        }
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f, parent: methods[x],
+        )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
+        obj = ElementForTest('ident')
+        func = mocker.Mock(_micropath_handler=False)
+
+        decorator = obj.route('get', 'put', 'get')
+
+        assert callable(decorator)
+        assert decorator != func
+        mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
+        assert obj.methods == {}
+
+        result = decorator(func)
+
+        assert result == func
+        mock_Method.assert_has_calls([
+            mocker.call('get', func, parent=obj),
+            mocker.call('put', func, parent=obj),
+        ])
+        assert mock_Method.call_count == 2
+        mock_from_func.assert_called_once_with(func)
+        assert obj.methods == methods
+        assert func._micropath_handler is True
+        assert func._micropath_elem is obj
+
+    def test_route_with_methods_external_duplicate(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get'),
+            'put': mocker.Mock(ident='put'),
+        }
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f, parent: methods[x],
+        )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
+        obj = ElementForTest('ident')
+        obj.methods['get'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.route('get', 'put')
+        mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
+        assert obj.methods == {'get': 'conflict'}
+
     def test_mount_base(self, mocker):
         mock_init = mocker.patch.object(
             elements.Delegation, '__init__',
@@ -907,14 +310,14 @@ class TestElement(object):
         assert isinstance(result, elements.Delegation)
         assert result.element == obj
         assert obj.methods == {}
-        assert obj._delegation == result
+        assert obj.delegation == result
         mock_init.assert_called_once_with('delegation', {})
         mock_Method.assert_not_called()
 
     def test_mount_with_methods(self, mocker):
         methods = {
-            'get': mocker.Mock(ident='get', _delegation=None),
-            'put': mocker.Mock(ident='put', _delegation=None),
+            'get': mocker.Mock(ident='get', delegation=None),
+            'put': mocker.Mock(ident='put', delegation=None),
         }
         mock_init = mocker.patch.object(
             elements.Delegation, '__init__',
@@ -932,14 +335,69 @@ class TestElement(object):
         assert result.element == obj
         assert obj.methods == methods
         for meth in methods.values():
-            assert meth._delegation == result
-        assert obj._delegation is None
+            assert meth.delegation == result
+        assert obj.delegation is None
         mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
         mock_Method.assert_has_calls([
             mocker.call('get', None, parent=obj),
             mocker.call('put', None, parent=obj),
         ])
         assert mock_Method.call_count == 2
+
+    def test_mount_with_methods_internal_duplication(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get', delegation=None),
+            'put': mocker.Mock(ident='put', delegation=None),
+        }
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f, parent: methods[x],
+        )
+        obj = ElementForTest('ident')
+
+        result = obj.mount('delegation', 'get', 'put', 'get', a=1, b=2)
+
+        assert isinstance(result, elements.Delegation)
+        assert result.element == obj
+        assert obj.methods == methods
+        for meth in methods.values():
+            assert meth.delegation == result
+        assert obj.delegation is None
+        mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
+        mock_Method.assert_has_calls([
+            mocker.call('get', None, parent=obj),
+            mocker.call('put', None, parent=obj),
+        ])
+        assert mock_Method.call_count == 2
+
+    def test_mount_with_methods_external_duplication(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get', delegation=None),
+            'put': mocker.Mock(ident='put', delegation=None),
+        }
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f, parent: methods[x],
+        )
+        obj = ElementForTest('ident')
+        obj.methods['get'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.mount('delegation', 'get', 'put', a=1, b=2)
+        assert obj.methods == {'get': 'conflict'}
+        for meth in methods.values():
+            assert meth.delegation is None
+        assert obj.delegation is None
+        mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
+        mock_Method.assert_not_called()
 
     def test_mount_delegation(self, mocker):
         delegation = elements.Delegation('delegation', {})
@@ -958,7 +416,7 @@ class TestElement(object):
         assert result == delegation
         assert result.element == obj
         assert obj.methods == {}
-        assert obj._delegation == delegation
+        assert obj.delegation == delegation
         mock_init.assert_not_called()
         mock_Method.assert_not_called()
 
@@ -972,55 +430,14 @@ class TestElement(object):
             return_value=mocker.Mock(ident=None),
         )
         obj = ElementForTest('ident')
-        obj._delegation = 'spam'
+        obj.delegation = 'spam'
 
         with pytest.raises(ValueError):
             obj.mount('delegation')
         assert obj.methods == {}
-        assert obj._delegation == 'spam'
+        assert obj.delegation == 'spam'
         mock_init.assert_not_called()
         mock_Method.assert_not_called()
-
-    def test_mount_master(self, mocker):
-        mock_init = mocker.patch.object(
-            elements.Delegation, '__init__',
-            return_value=None,
-        )
-        mock_Method = mocker.patch.object(
-            elements, 'Method',
-            return_value=mocker.Mock(ident=None),
-        )
-        obj = ElementForTest('ident')
-        obj._master = mocker.Mock(**{
-            'mount.return_value': mocker.Mock(element=None),
-        })
-
-        result = obj.mount('delegation', 'get', 'put', a=1, b=2)
-
-        assert result == obj._master.mount.return_value
-        assert result.element is None
-        assert obj.methods == {}
-        assert obj._delegation is None
-        mock_init.assert_not_called()
-        mock_Method.assert_not_called()
-        obj._master.mount.assert_called_once_with(
-            'delegation', 'get', 'put',
-            a=1,
-            b=2,
-        )
-
-    def test_delegation_base(self):
-        obj = ElementForTest('ident')
-        obj._delegation = 'delegation'
-
-        assert obj.delegation == 'delegation'
-
-    def test_delegation_delegated(self, mocker):
-        obj = ElementForTest('ident')
-        obj._master = mocker.Mock(delegation='delegation')
-        obj._delegation = 'spam'
-
-        assert obj.delegation == 'delegation'
 
 
 class TestRoot(object):
@@ -1042,11 +459,9 @@ class TestRoot(object):
             obj.set_ident('ident')
 
     def test_add_elem_path(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Path, ident='spam')
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1055,15 +470,27 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
-        mock_merge.assert_not_called()
+        elem.set_ident.assert_not_called()
+
+    def test_add_elem_path_conflict(self, mocker):
+        elem = mocker.Mock(spec=elements.Path, ident='spam')
+        elem.parent = None
+        obj = elements.Root()
+        obj.paths['spam'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.add_elem(elem)
+        assert obj.paths == {'spam': 'conflict'}
+        assert obj.bindings == {}
+        assert obj.methods == {}
+        assert elem.ident == 'spam'
+        assert elem.parent is None
         elem.set_ident.assert_not_called()
 
     def test_add_elem_binding(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Binding, ident='spam')
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1072,15 +499,27 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
-        mock_merge.assert_not_called()
+        elem.set_ident.assert_not_called()
+
+    def test_add_elem_binding_conflict(self, mocker):
+        elem = mocker.Mock(spec=elements.Binding, ident='spam')
+        elem.parent = None
+        obj = elements.Root()
+        obj.bindings['spam'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.add_elem(elem)
+        assert obj.paths == {}
+        assert obj.bindings == {'spam': 'conflict'}
+        assert obj.methods == {}
+        assert elem.ident == 'spam'
+        assert elem.parent is None
         elem.set_ident.assert_not_called()
 
     def test_add_elem_method(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Method, ident='spam')
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1089,15 +528,27 @@ class TestRoot(object):
         assert obj.methods == {'spam': elem}
         assert elem.ident == 'spam'
         assert elem.parent is obj
-        mock_merge.assert_not_called()
+        elem.set_ident.assert_not_called()
+
+    def test_add_elem_method_conflict(self, mocker):
+        elem = mocker.Mock(spec=elements.Method, ident='spam')
+        elem.parent = None
+        obj = elements.Root()
+        obj.methods['spam'] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.add_elem(elem)
+        assert obj.paths == {}
+        assert obj.bindings == {}
+        assert obj.methods == {'spam': 'conflict'}
+        assert elem.ident == 'spam'
+        assert elem.parent is None
         elem.set_ident.assert_not_called()
 
     def test_add_elem_method_all(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Method, ident=None)
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1106,15 +557,27 @@ class TestRoot(object):
         assert obj.methods == {None: elem}
         assert elem.ident is None
         assert elem.parent is obj
-        mock_merge.assert_not_called()
+        elem.set_ident.assert_not_called()
+
+    def test_add_elem_method_all_conflict(self, mocker):
+        elem = mocker.Mock(spec=elements.Method, ident=None)
+        elem.parent = None
+        obj = elements.Root()
+        obj.methods[None] = 'conflict'
+
+        with pytest.raises(ValueError):
+            obj.add_elem(elem)
+        assert obj.paths == {}
+        assert obj.bindings == {}
+        assert obj.methods == {None: 'conflict'}
+        assert elem.ident is None
+        assert elem.parent is None
         elem.set_ident.assert_not_called()
 
     def test_add_elem_other(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(ident='spam')
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         with pytest.raises(ValueError):
             obj.add_elem(elem)
@@ -1123,44 +586,35 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is None
-        mock_merge.assert_not_called()
         elem.set_ident.assert_not_called()
 
     def test_add_elem_self(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(obj)
 
         assert obj.paths == {}
         assert obj.bindings == {}
         assert obj.methods == {}
-        mock_merge.assert_not_called()
 
     def test_add_elem_root(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Root, ident=None)
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
-        obj.add_elem(elem)
-
+        with pytest.raises(ValueError):
+            obj.add_elem(elem)
         assert obj.paths == {}
         assert obj.bindings == {}
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is None
-        mock_merge.assert_called_once_with(elem)
         elem.set_ident.assert_not_called()
 
     def test_add_elem_path_no_ident(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Path, ident=None)
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1169,15 +623,12 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
-        mock_merge.assert_not_called()
         elem.set_ident.assert_not_called()
 
     def test_add_elem_binding_no_ident(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Binding, ident=None)
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem)
 
@@ -1186,15 +637,12 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
-        mock_merge.assert_not_called()
         elem.set_ident.assert_not_called()
 
     def test_add_elem_set_ident(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Path, ident=None)
         elem.parent = None
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(elem, 'spam')
 
@@ -1203,17 +651,14 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident is None
         assert elem.parent is obj
-        mock_merge.assert_not_called()
         elem.set_ident.assert_called_once_with('spam')
 
     def test_add_elem_parents(self, mocker):
-        mock_merge = mocker.patch.object(elements.Root, 'merge')
         elem = mocker.Mock(spec=elements.Path, ident='spam')
         elem.parent = None
         descendant = mocker.Mock(spec=elements.Path, ident=None)
         descendant.parent = elem
         obj = elements.Root()
-        obj.bindings = {}
 
         obj.add_elem(descendant, 'descendant')
 
@@ -1222,7 +667,6 @@ class TestRoot(object):
         assert obj.methods == {}
         assert elem.ident == 'spam'
         assert elem.parent is obj
-        mock_merge.assert_not_called()
         elem.set_ident.assert_not_called()
         descendant.set_ident.assert_called_once_with('descendant')
 
@@ -1244,6 +688,16 @@ class TestPath(object):
         obj.set_ident('ident')
 
         assert obj.parent.paths == {None: obj}
+        mock_set_ident.assert_called_once_with('ident')
+
+    def test_set_ident_conflict(self, mocker):
+        mock_set_ident = mocker.patch.object(elements.Element, 'set_ident')
+        obj = elements.Path(None)
+        obj.parent = mocker.Mock(paths={None: 'conflict'})
+
+        with pytest.raises(ValueError):
+            obj.set_ident('ident')
+        assert obj.parent.paths == {None: 'conflict'}
         mock_set_ident.assert_called_once_with('ident')
 
 
@@ -1355,6 +809,16 @@ class TestBinding(object):
         obj.set_ident('ident')
 
         assert obj.parent.bindings == {None: obj}
+        mock_set_ident.assert_called_once_with('ident')
+
+    def test_set_ident_conflict(self, mocker):
+        mock_set_ident = mocker.patch.object(elements.Element, 'set_ident')
+        obj = elements.Binding(None)
+        obj.parent = mocker.Mock(bindings={None: 'conflict'})
+
+        with pytest.raises(ValueError):
+            obj.set_ident('ident')
+        assert obj.parent.bindings == {None: 'conflict'}
         mock_set_ident.assert_called_once_with('ident')
 
     def test_validator_base(self, mocker):
@@ -1506,63 +970,6 @@ class TestMethod(object):
 
         assert result == mock_mount.return_value
         mock_mount.assert_called_once_with('delegation')
-
-
-class TestMergingMap(object):
-    def test_init(self):
-        result = elements.MergingMap()
-
-        assert result._map == {}
-
-    def test_len(self):
-        obj = elements.MergingMap()
-        obj._map = {'a': 1, 'b': 2, 'c': 3}
-
-        assert len(obj) == 3
-
-    def test_iter(self):
-        obj = elements.MergingMap()
-        obj._map = {'a': 1, 'b': 2, 'c': 3}
-
-        assert set(iter(obj)) == set(['a', 'b', 'c'])
-
-    def test_getitem(self):
-        obj = elements.MergingMap()
-        obj._map = {'a': 1, 'b': 2, 'c': 3}
-
-        assert obj['a'] == 1
-
-    def test_setitem_new(self, mocker):
-        obj = elements.MergingMap()
-        item = mocker.Mock(ident='spam')
-
-        obj['spam'] = item
-
-        assert obj._map == {'spam': item}
-
-    def test_setitem_merge(self, mocker):
-        obj = elements.MergingMap()
-        existing = mocker.Mock()
-        obj._map = {'spam': existing}
-        item = mocker.Mock(ident='spam')
-
-        obj['spam'] = item
-
-        assert obj._map == {'spam': existing}
-        existing.merge.assert_called_once_with(item)
-
-    def test_delitem_exists(self):
-        obj = elements.MergingMap()
-        obj._map = {'spam': 'item'}
-
-        with pytest.raises(ValueError):
-            del obj['spam']
-
-    def test_delitem_missing(self):
-        obj = elements.MergingMap()
-
-        with pytest.raises(KeyError):
-            del obj['spam']
 
 
 class TestDelegation(object):
@@ -1774,6 +1181,41 @@ class TestRoute(object):
         assert func._micropath_methods == [methods[x] for x in ('get', 'put')]
         assert func._micropath_handler is True
 
+    def test_with_methods_internal_duplicate(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get'),
+            'put': mocker.Mock(ident='put'),
+        }
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f: methods[x],
+        )
+        mock_from_func = mocker.patch.object(
+            elements.injector.WantSignature, 'from_func',
+        )
+        func = mocker.Mock(_micropath_methods=None, _micropath_handler=False)
+
+        decorator = elements.route('get', 'put', 'get')
+
+        assert callable(decorator)
+        assert decorator != func
+        mock_Method.assert_not_called()
+        mock_from_func.assert_not_called()
+        assert func._micropath_methods is None
+        assert func._micropath_handler is False
+
+        result = decorator(func)
+
+        assert result == func
+        mock_Method.assert_has_calls([
+            mocker.call('get', func),
+            mocker.call('put', func),
+        ])
+        assert mock_Method.call_count == 2
+        mock_from_func.assert_called_once_with(func)
+        assert func._micropath_methods == [methods[x] for x in ('get', 'put')]
+        assert func._micropath_handler is True
+
 
 class TestMount(object):
     def test_base(self, mocker):
@@ -1795,8 +1237,8 @@ class TestMount(object):
 
     def test_with_methods(self, mocker):
         methods = {
-            'get': mocker.Mock(ident='get', _delegation=None),
-            'put': mocker.Mock(ident='put', _delegation=None),
+            'get': mocker.Mock(ident='get', delegation=None),
+            'put': mocker.Mock(ident='put', delegation=None),
         }
         mock_init = mocker.patch.object(
             elements.Delegation, '__init__',
@@ -1808,6 +1250,30 @@ class TestMount(object):
         )
 
         result = elements.mount('delegation', 'get', 'put', a=1, b=2)
+
+        assert isinstance(result, elements.Delegation)
+        assert result._micropath_methods == [methods['get'], methods['put']]
+        mock_init.assert_called_once_with('delegation', {'a': 1, 'b': 2})
+        mock_Method.assert_has_calls([
+            mocker.call('get', None),
+            mocker.call('put', None),
+        ])
+
+    def test_with_methods_internal_duplication(self, mocker):
+        methods = {
+            'get': mocker.Mock(ident='get', delegation=None),
+            'put': mocker.Mock(ident='put', delegation=None),
+        }
+        mock_init = mocker.patch.object(
+            elements.Delegation, '__init__',
+            return_value=None,
+        )
+        mock_Method = mocker.patch.object(
+            elements, 'Method',
+            side_effect=lambda x, f: methods[x],
+        )
+
+        result = elements.mount('delegation', 'get', 'put', 'get', a=1, b=2)
 
         assert isinstance(result, elements.Delegation)
         assert result._micropath_methods == [methods['get'], methods['put']]
