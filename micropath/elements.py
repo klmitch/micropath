@@ -13,7 +13,6 @@
 # permissions and limitations under the License.
 
 import abc
-import functools
 
 import six
 
@@ -410,7 +409,6 @@ class SkipBinding(Exception):
     pass
 
 
-@functools.total_ordering
 class Binding(Element):
     """
     Represent a variable path element.  In addition to being in the
@@ -436,72 +434,6 @@ class Binding(Element):
         # Initialize the validator and formatter
         self._validator = None
         self._formatter = None
-
-    def __hash__(self):
-        """
-        Retrieve the hash value of the binding.  This will be the hash
-        value of the variable name.
-
-        :returns: The hash value of the binding.
-        :rtype: ``int``
-        """
-
-        return hash(self.ident)
-
-    def __eq__(self, other):
-        """
-        Determine if this binding is equal to another binding.  This
-        compares the identifiers of the two bindings.
-
-        :param other: The other binding.
-        :type other: ``Binding``
-
-        :returns: A ``True`` value if the comparison is true, or
-                  ``False`` if not.
-        """
-
-        # Can't be equal if other isn't a Binding
-        if not isinstance(other, Binding):
-            return False
-
-        return self.ident == other.ident
-
-    def __ne__(self, other):
-        """
-        Determine if this binding is not equal to another binding.  This
-        compares the identifiers of the two bindings.
-
-        :param other: The other binding.
-        :type other: ``Binding``
-
-        :returns: A ``True`` value if the comparison is true, or
-                  ``False`` if not.
-        """
-
-        # Can't be equal if other isn't a Binding
-        if not isinstance(other, Binding):
-            return True
-
-        return self.ident != other.ident
-
-    def __lt__(self, other):
-        """
-        Determine if this binding is less than another binding.  This
-        compares the identifiers of the two bindings.
-
-        :param other: The other binding.
-        :type other: ``Binding``
-
-        :returns: A ``True`` value if the comparison is true, or
-                  ``False`` if not.  If ``other`` is not a
-                  ``Binding``, ``NotImplemented`` is returned.
-        """
-
-        # Can't be compared if other isn't a Binding
-        if not isinstance(other, Binding):
-            return NotImplemented
-
-        return self.ident < other.ident
 
     def set_ident(self, ident):
         """
