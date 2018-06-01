@@ -49,7 +49,7 @@ class Element(object):
 
         # Set up subordinate lists
         self.paths = MergingMap()
-        self.bindings = BindingMap()
+        self.bindings = MergingMap()
         self.methods = MergingMap()
 
         # For delegation to other controllers
@@ -191,7 +191,7 @@ class Element(object):
 
         return elem
 
-    def bind(self, ident=None, before=None, after=None):
+    def bind(self, ident=None):
         """
         Construct a new subordinate ``Binding`` element.
 
@@ -208,7 +208,7 @@ class Element(object):
         """
 
         # Construct the new binding
-        elem = Binding(ident, parent=self, before=before, after=after)
+        elem = Binding(ident, parent=self)
 
         # If it has an identifier, add it to the lists
         if elem.ident:
@@ -470,12 +470,10 @@ class Binding(Element):
     """
     Represent a variable path element.  In addition to being in the
     tree, variable path elements have an optional validator function
-    (use the ``@Binding.validator`` decorator to set), as well as
-    ``before`` and ``after`` sets that may be used to influence the
-    order in which variables are tried.
+    (use the ``@Binding.validator`` decorator to set).
     """
 
-    def __init__(self, ident, parent=None, before=None, after=None):
+    def __init__(self, ident, parent=None):
         """
         Initialize a ``Binding`` instance.
 
@@ -485,22 +483,10 @@ class Binding(Element):
         :param parent: The parent element.  Defaults to ``None``,
                        indicating the root of the element tree.
         :type parent: ``Element``
-        :param before: An iterable of other ``Binding`` instances at
-                       the same level of the tree (meaning they have
-                       the same parent) which should be checked before
-                       trying this binding.
-        :param after: An iterable of other ``Binding`` instances at
-                      the same level of the tree (meaning they have
-                      the same parent) which should be checked after
-                      trying this binding.
         """
 
         # Call the superclass first
         super(Binding, self).__init__(ident, parent)
-
-        # Save the before and after sets
-        self.before = set(before or [])
-        self.after = set(after or [])
 
         # Initialize the validator and formatter
         self._validator = None
@@ -775,7 +761,7 @@ class Method(Element):
 
         raise ValueError('cannot attach a path to a method')
 
-    def bind(self, ident=None, before=None, after=None):
+    def bind(self, ident=None):
         """
         Construct a new subordinate ``Binding`` element.
 
@@ -921,124 +907,6 @@ class MergingMap(collections.MutableMapping):
         raise KeyError(key)
 
 
-# Used as an element in the work queue of BindingMap._visit()
-_VisitElem = collections.namedtuple('_VisitElem', ['binding', 'before'])
-
-
-def _from_adj(adjacency, item):
-    """
-    Construct a ``_VisitElem`` instance from the adjacency dictionary
-    and a specified item from the adjacency dictionary.  This is a
-    helper that simplifies the call required to create the queue item.
-
-    :param adjacency: The adjacency dictionary.
-    :type adjacency: ``dict`` mapping ``Binding`` to ``set`` of
-                     ``Binding``
-    :param item: The item to explore.
-    :type item: ``Binding``
-    """
-
-    return _VisitElem(item, iter(sorted(adjacency.pop(item), reverse=True)))
-
-
-class BindingMap(MergingMap):
-    """
-    A mapping of ``Binding`` instances.  This differs from a regular
-    dictionary in that the ordering of ``Binding`` instances is
-    controlled by the contents of their ``before`` and ``after`` sets
-    and the lexicographic ordering of their identifiers.
-    """
-
-    def __init__(self):
-        """
-        Initialize a ``BindingMap`` instance.
-        """
-
-        # Initialize the map
-        super(BindingMap, self).__init__()
-
-        # Ordering is computed lazily
-        self._order = None
-
-    def __iter__(self):
-        """
-        Iterate over the keys in the binding map.  This topologically
-        sorts the bindings based on their ``before`` and ``after``
-        sets, using lexicographic sorting to break ties.
-
-        :returns: An iterator of binding identifiers.
-        """
-
-        if self._order is None:
-            # Start by computing the adjacency map
-            adjacency = collections.defaultdict(lambda: set())
-            for binding in self._map.values():
-                # Collapse before and after into a single before set
-                adjacency[binding] |= {other for other in binding.before}
-                for other in binding.after:
-                    adjacency[other].add(other)
-
-            # Initialize the order list
-            self._order = []
-
-            # Kick off the topological sort
-            for item in sorted(adjacency, reverse=True):
-                # Items may have already been popped, so only visit
-                # them if they're still present
-                if item in adjacency:
-                    self._visit(adjacency, _from_adj(adjacency, item))
-
-            # This algorithm produces a reverse order, so reverse in
-            # place
-            self._order.reverse()
-
-        # Return an iterator over item identifiers
-        return iter(elem.ident for elem in self._order)
-
-    def __setitem__(self, key, value):
-        """
-        Set the binding with a given identifier.
-
-        :param str key: The identifier of the ``Binding`` instance.
-        :param value: The actual binding.
-        :type value: ``Binding``
-
-        :raises ValueError:
-            The key has already been set.
-        """
-
-        super(BindingMap, self).__setitem__(key, value)
-
-        # Invalidate the order cache
-        self._order = None
-
-    def _visit(self, adjacency, elem):
-        """
-        Implement the inner visit of the topological sort algorithm.
-
-        :param adjacency: The adjacency dictionary, as computed by
-                          ``__iter__()`` and updated by previous
-                          ``_visit()`` invocations.
-        :type adjacency: ``dict`` mapping ``Binding`` to ``set`` of
-                         ``Binding``
-        """
-
-        # Work queue
-        queue = [elem]
-
-        while queue:
-            try:
-                # Get the next binding that should be before this one
-                binding = six.next(queue[-1].before)
-                if binding in adjacency:
-                    # Pop that node off the adjacency map and add it
-                    # to the queue
-                    queue.append(_from_adj(adjacency, binding))
-            except StopIteration:
-                # Explored all its dependencies, add it to the results
-                self._order.append(queue.pop().binding)
-
-
 class Delegation(object):
     """
     Default delegation for controller classes.  Implements the
@@ -1172,7 +1040,7 @@ def path(ident=None):
     return Path(ident)
 
 
-def bind(ident=None, before=None, after=None):
+def bind(ident=None):
     """
     Construct a new ``Binding`` element.
 
@@ -1188,7 +1056,7 @@ def bind(ident=None, before=None, after=None):
     """
 
     # Construct the new binding
-    return Binding(ident, before=before, after=after)
+    return Binding(ident)
 
 
 def route(*methods):

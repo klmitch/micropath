@@ -35,7 +35,7 @@ class TestElement(object):
         assert result.parent is None
         assert isinstance(result.paths, elements.MergingMap)
         assert result.paths == {}
-        assert isinstance(result.bindings, elements.BindingMap)
+        assert isinstance(result.bindings, elements.MergingMap)
         assert result.bindings == {}
         assert isinstance(result.methods, elements.MergingMap)
         assert result.methods == {}
@@ -49,7 +49,7 @@ class TestElement(object):
         assert result.parent == 'parent'
         assert isinstance(result.paths, elements.MergingMap)
         assert result.paths == {}
-        assert isinstance(result.bindings, elements.BindingMap)
+        assert isinstance(result.bindings, elements.MergingMap)
         assert result.bindings == {}
         assert isinstance(result.methods, elements.MergingMap)
         assert result.methods == {}
@@ -787,8 +787,6 @@ class TestElement(object):
         mock_Binding.assert_called_once_with(
             None,
             parent=obj,
-            before=None,
-            after=None,
         )
         assert obj.bindings == {}
 
@@ -800,14 +798,12 @@ class TestElement(object):
         obj = ElementForTest('ident')
         obj.bindings = {}
 
-        result = obj.bind('spam', 'before', 'after')
+        result = obj.bind('spam')
 
         assert result == mock_Binding.return_value
         mock_Binding.assert_called_once_with(
             'spam',
             parent=obj,
-            before='before',
-            after='after',
         )
         assert obj.bindings == {'spam': result}
 
@@ -1260,8 +1256,6 @@ class TestBinding(object):
 
         result = elements.Binding('ident')
 
-        assert result.before == set()
-        assert result.after == set()
         assert result._validator is None
         assert result._formatter is None
         mock_init.assert_called_once_with('ident', None)
@@ -1273,11 +1267,9 @@ class TestBinding(object):
         )
 
         result = elements.Binding(
-            'ident', 'parent', ['b1', 'b2'], ['a1', 'a2'],
+            'ident', 'parent',
         )
 
-        assert result.before == set(['b1', 'b2'])
-        assert result.after == set(['a1', 'a2'])
         assert result._validator is None
         assert result._formatter is None
         mock_init.assert_called_once_with('ident', 'parent')
@@ -1492,7 +1484,7 @@ class TestMethod(object):
         obj = elements.Method(None, 'func')
 
         with pytest.raises(ValueError):
-            obj.bind('ident', 'before', 'after')
+            obj.bind('ident')
 
     def test_route_base(self):
         obj = elements.Method(None, 'func')
@@ -1571,106 +1563,6 @@ class TestMergingMap(object):
 
         with pytest.raises(KeyError):
             del obj['spam']
-
-
-class TestFromAdj(object):
-    def test_base(self):
-        adjacency = {'spam': set(['a', 'b', 'c', 'd']), 'other': set()}
-
-        result = elements._from_adj(adjacency, 'spam')
-
-        assert isinstance(result, elements._VisitElem)
-        assert result[0] == 'spam'
-        assert list(result[1]) == ['d', 'c', 'b', 'a']
-        assert adjacency == {'other': set()}
-
-
-class TestBindingMap(object):
-    def test_init(self, mocker):
-        mock_init = mocker.patch.object(
-            elements.MergingMap, '__init__',
-            return_value=None,
-        )
-
-        result = elements.BindingMap()
-
-        assert result._order is None
-        mock_init.assert_called_once_with()
-
-    def test_iter_uncached(self, mocker):
-        def fake_visit(adj, elem):
-            obj._order[:] = [obj._map[x] for x in ('a', 'b', 'c')]
-            adj.pop(obj._map['c'], None)
-        mock_visit = mocker.patch.object(
-            elements.BindingMap, '_visit',
-            side_effect=fake_visit,
-        )
-        obj = elements.BindingMap()
-        obj._map['c'] = elements.Binding('c')
-        obj._map['e'] = elements.Binding('e')
-        obj._map['a'] = elements.Binding('a', before=[obj._map['c']])
-        obj._map['d'] = elements.Binding('d', after=[obj._map['a']])
-        obj._map['b'] = elements.Binding('b', before=[obj._map['d']])
-        adjacency = {x: obj._map[x] for x in ('a', 'b', 'd', 'e')}
-
-        result = list(iter(obj))
-
-        assert result == ['c', 'b', 'a']
-        assert obj._order == [obj._map[x] for x in ('c', 'b', 'a')]
-        assert mock_visit.call_count == 4
-        for i, key in enumerate(['e', 'd', 'b', 'a']):
-            mock_visit.call_args_list[i][0][0] == adjacency
-
-    def test_iter_cached(self, mocker):
-        def fake_visit(adj, elem):
-            obj._order[:] = [obj._map[x] for x in ('a', 'b', 'c')]
-            adj.pop(obj._map['c'], None)
-        mock_visit = mocker.patch.object(
-            elements.BindingMap, '_visit',
-            side_effect=fake_visit,
-        )
-        obj = elements.BindingMap()
-        obj._map['c'] = elements.Binding('c')
-        obj._map['e'] = elements.Binding('e')
-        obj._map['a'] = elements.Binding('a', before=[obj._map['c']])
-        obj._map['d'] = elements.Binding('d', after=[obj._map['a']])
-        obj._map['b'] = elements.Binding('b', before=[obj._map['d']])
-        obj._order = [obj._map[x] for x in ('a', 'b', 'c')]
-
-        result = list(iter(obj))
-
-        assert result == ['a', 'b', 'c']
-        assert obj._order == [obj._map[x] for x in ('a', 'b', 'c')]
-        mock_visit.assert_not_called()
-
-    def test_setitem(self, mocker):
-        mock_setitem = mocker.patch.object(elements.MergingMap, '__setitem__')
-        obj = elements.BindingMap()
-        obj._order = 'cached'
-
-        obj['spam'] = 'value'
-
-        assert obj._order is None
-        mock_setitem.assert_called_once_with('spam', 'value')
-
-    def test_visit(self, mocker):
-        bindings = {x: elements.Binding(x) for x in ('a', 'b', 'c', 'd', 'e')}
-        adjacency = {
-            bindings['b']: {bindings['d']},
-            bindings['c']: set(),
-            bindings['d']: {bindings['b']},
-            bindings['e']: set(),
-        }
-        elem = elements._VisitElem(
-            bindings['a'], iter(bindings[x] for x in ('d', 'c')),
-        )
-        obj = elements.BindingMap()
-        obj._order = []
-
-        obj._visit(adjacency, elem)
-
-        assert adjacency == {bindings['e']: set()}
-        assert obj._order == [bindings[x] for x in ['b', 'd', 'c', 'a']]
 
 
 class TestDelegation(object):
@@ -1788,18 +1680,16 @@ class TestBind(object):
         result = elements.bind()
 
         assert result == mock_Binding.return_value
-        mock_Binding.assert_called_once_with(None, before=None, after=None)
+        mock_Binding.assert_called_once_with(None)
 
     def test_alt(self, mocker):
         mock_Binding = mocker.patch.object(elements, 'Binding')
 
-        result = elements.bind('ident', 'before', 'after')
+        result = elements.bind('ident')
 
         assert result == mock_Binding.return_value
         mock_Binding.assert_called_once_with(
             'ident',
-            before='before',
-            after='after',
         )
 
 
