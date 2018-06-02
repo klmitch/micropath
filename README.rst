@@ -2,6 +2,9 @@
 The micropath Web Application Framework
 =======================================
 
+.. image:: https://travis-ci.org/klmitch/micropath.svg?branch=master
+    :target: https://travis-ci.org/klmitch/micropath
+
 The ``micropath`` web application framework is a framework for
 constructing web applications.  It is based on the UNIX philosophy: do
 one thing and do it well.  The ``micropath`` framework is ideally
