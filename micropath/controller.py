@@ -119,9 +119,12 @@ class Controller(object):
         the same name to enable debugging responses; this will include
         traceback and debugging information in the 500 error generated
         if the ``micropath_server_error()`` hook method raises an
-        exception.  WARNING: THIS ATTRIBUTE MUST NOT BE SET TO
-        ``True`` ON PRODUCTION SERVERS!  Exception information can
-        leak security-sensitive data to callers.
+        exception.  The default implementations of
+        ``micropath_request_error()`` and ``micropath_server_error()``
+        also include traceback and debugging information if this
+        attribute is ``True``.  WARNING: THIS ATTRIBUTE MUST NOT BE
+        SET TO ``True`` ON PRODUCTION SERVERS!  Exception information
+        can leak security-sensitive data to callers.
     * ``micropath_request_attrs`` - A dictionary of request attributes
         that may be injected into handler methods.  The keys of this
         dictionary are the parameter names the handler methods may
@@ -162,6 +165,17 @@ class Controller(object):
         must be implemented in each ``Controller`` subclass, so if
         customizing this hook, it is recommended to create a base
         class with the desired implementation, then subclass that.
+    * ``micropath_request_error()`` - Called if a handler method
+        requests an attribute of the request object, but an error
+        occurs while accessing that attribute.  This typically
+        indicates a format error with the requested resource, such as
+        invalid JSON data when attempting to access ``json_body``.  As
+        such, the default implementation returns a bare
+        ``webob.exc.HTTPBadRequest``, which causes a 400 error to be
+        returned to the HTTP client.  Only the implementation in the
+        root ``Controller`` subclass is useful.  Also note that the
+        return value of this hook method must be a subclass of
+        ``Exception``.
     * ``micropath_not_found()`` - Called if the path could not be
         resolved.  Note that this will not be called for a given
         request if the handler function for that URL and HTTP method
@@ -182,13 +196,18 @@ class Controller(object):
         is recommended to create a base class with the desired
         implementation, then subclass that.
 
-    Finally, the ``Controller`` base class defines an ``__init__()``
+    The ``Controller`` base class also defines an ``__init__()``
     method that all subclasses must ensure is called with no
     arguments.  This base ``__init__()`` method instantiates the
     mounted controllers, in order to ensure that there are no race
     conditions during request processing in the face of threaded WSGI
     servers.  This means that the ``micropath`` framework is itself
     thread-safe, without needing to use any threading primitives.
+
+    Finally, a convenience ``micropath_run()`` method is provided for
+    testing purposes (it should not be used on production systems).
+    This method serves the WSGI application at a specified host and
+    port.
     """
 
     # Set the default class to use for requests
