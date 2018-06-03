@@ -58,7 +58,13 @@ elements are then bound to handler methods using the
 controller) or ``@Element.route()`` decorator (for requests relative
 to an ``Element`` returned by a ``micropath.path()`` or
 ``micropath.bind()``), which takes as arguments the HTTP methods that
-should trigger the handler.
+should trigger the handler.  (Note: either form of the ``@route()``
+decorator must be the outer-most decorator on a helper method--that
+is, the ``@route()`` must be the very first decorator in the source
+file.  This decorator stores the function that is passed to it in the
+``Element`` tree, so any decorators that occur before it in the source
+file will not be invoked when handling a request, even though they
+would be if directly accessing the method through the class instance.)
 
 The following example should help clarify how these components work
 together.  The example is a part of a REST-style web API for a library
@@ -167,6 +173,46 @@ the ``SubscriberController`` like so::
     # the superclass method is called.
     books = sub_id.path().mount(BookController)
 
+Path Binding Validation and Translation
+=======================================
+
+In the examples above, the values assigned to ``sub_id`` and
+``book_id`` are passed as simple strings to the hook methods.
+However, bindings can also have validators and formatters: a
+*validator* is a method that is passed the ``value`` argument (and any
+other request elements that can be injected, including bindings from
+earlier in the path).  The validator should validate that the value is
+legal and return whatever object should be passed to handlers.  This
+could be used to, for instance, resolve a subscriber ID into an actual
+subscriber model object that would subsequently be passed to the
+handler methods.  Validators should not raise just any exception,
+however; they may raise any of the exceptions contained in
+``webob.exc``, which will cause a suitable error to be returned to the
+user, or they may raise ``micropath.SkipBinding``, which will
+ultimately result in returning a 404 to the client.  Any other
+exception will result in a 500 error being returned.
+
+In addition to the validator, a binding may have a *formatter*; this
+is a function that will be passed the object that was passed to
+``micropath.Request.url_for()`` for that binding, and must return a
+string suitable for inclusion in the URL.  An application that uses
+the ``url_for()`` method should either provide a formatter or ensure
+that the object has an implemented ``__str__()`` method.
+
+Validators and formatters are set by decorating methods with the
+``@validator`` and ``@formatter`` decorators, respectively.  For
+instance, for the ``SubscriberController`` example above, the
+following would set the validator and formatter functions for
+``sub_id``::
+
+    @sub_id.validator
+    def sub_id_validator(self, value):
+        ...
+
+    @sub_id.formatter
+    def sub_id_formatter(self, value):
+        ...
+
 Requests
 ========
 
@@ -216,3 +262,153 @@ can be customized by overriding the ``micropath_construct()`` method
 of the controller class onto which another controller is mounted.
 This means that configuration information can be propagated to the
 other controllers quite easily.
+
+Dependency Injection and Wrapping Decorators
+============================================
+
+Handler methods in ``micropath`` are invoked using dependency
+injection, passing them the arguments that are declared as part of the
+method signature.  However, handler methods are often additionally
+decorated with wrapping-type decorators; that is, the decorator
+creates a function, typically taking ``*args`` and ``**kwargs``, does
+some processing, and then invokes the decorated function (or not,
+depending on what the decorator is intended to do).  This affects the
+function signature seen by the dependency injector, and could cause
+spurious failures.
+
+To counter this problem, the ``micropath`` framework provides a
+variation of ``@functools.wraps()``.  The ``@micropath.wraps()``
+decorator functions similarly to the ``@functools.wraps()`` decorator,
+but has some additional properties.  First, on Python 2.7, it ensures
+the ``__wrapped__`` attribute is set (this is implemented by Python
+3's ``@functools.wraps()``, but not present in Python 2.7's version);
+this makes it easier to get the underlying function, which could be
+useful for unit testing.  Second, the ``@micropath.wraps()`` decorator
+accepts three additional, optional keyword arguments: ``provides`` can
+be a list of keyword arguments that the wrapped function may want that
+are provided by the decorator; ``required`` is a list of keyword
+arguments that are required by the decorator itself; and ``optional``
+is a list of keyword arguments that may be provided if they're
+available in the injector.
+
+In addition to the ``@micropath.wraps()`` decorator, the ``micropath``
+framework also provides the ``micropath.call_wrapped()`` utility
+function.  This function takes as arguments the wrapped function, a
+tuple of positional arguments, and a dictionary of keyword arguments,
+and invokes the function using the injector machinery, returning the
+value of calling the function.  A ``micropath`` decorator may also
+wish to know if specific arguments are requested by the function; this
+may be determined using ``micropath.wants()``, which takes as
+arguments the wrapped function and the name of a keyword argument, and
+returns a boolean indicating whether the function wants the specified
+keyword argument.
+
+Using the ``@micropath.wraps()`` decorator and the
+``micropath.call_wrapped()`` function, function decorators can be
+created that wrap a handler method without disrupting the dependency
+injection mechanism that is integral to how ``micropath`` calls
+handler methods.
+
+Customizing Request Handling
+============================
+
+The ``micropath`` framework provides a number of ways of customizing
+request handling.  First of all, the class used for representing a
+request can be set by overriding the value of
+``Controller.micropath_request``; by default, this value is
+``micropath.Request``.  (It is highly recommended that custom request
+classes extend ``micropath.Request``, so that all functionality is
+available.)  Second, the request attributes that are available for
+dependency injection are stored in the
+``Controller.micropath_request_attrs`` dictionary; additional
+attributes can be added by copying
+``Controller.micropath_request_attrs`` and adding additional entries
+to it.  The keys of this dictionary will be the argument names, and if
+the value is ``None`` they will also name the attribute; otherwise,
+the value should be the name of the request attribute.
+
+After the request is constructed, the ``micropath`` framework invokes
+the ``Controller.micropath_prepare_injector()`` hook method.  The
+default implementation does nothing, but this method can be overridden
+in the root controller of an application to implement any desired
+behavior: authentication headers can be verified, additional data can
+be added to the dependency injector, etc.  This is the last step
+before traversing the element tree and invoking the proper handler
+method.
+
+Several other hook methods exist in the ``micropath.Controller``
+class.  For instance, if an error occurs while attempting to evaluate
+a request attribute for injection to a handler method, the
+``Controller.micropath_request_error()`` hook method is invoked; its
+default implementation will return a 400 error to the client.  If, on
+the other hand, an exception occurs in a handler method, the
+``Controller.micropath_server_error()`` hook method is invoked, which
+will, by default, return a 500 error to the client.  If the client's
+URL could not be mapped to a controller, the
+``Controller.micropath_not_found()`` hook method is called to generate
+a 404 error, and ``Controller.micropath_not_implemented()`` is called
+if the URL exists, but the specified HTTP method is not routed to a
+handler.  Finally, the ``Controller.micropath_options()`` provides the
+default implementation for the HTTP OPTIONS method; by default, it
+returns a 204 response with the "Allow" header containing a
+comma-separated list of recognized HTTP methods.
+
+Methods Requesting ``path_info``
+================================
+
+By default, the entire URL must be consumed for a handler method to be
+invoked.  However, a handler method may request the ``path_info``
+attribute of the request; if the handler method represents the longest
+match for the requested URL, the handler will be invoked with the
+remaining components of the URL path passed as the ``path_info``
+parameter of the handler method.  This effectively inhibits the usual
+behavior of returning a 404 response.
+
+Launching a ``micropath`` Application
+=====================================
+
+Instances of ``micropath.Controller`` subclasses are fully fledged
+WSGI applications.  Many WSGI servers want a module with an
+``application`` callable present that is the actual WSGI application;
+this attribute may simply be an instance of the root controller.  The
+exact semantics depend on the WSGI server, so refer to the
+documentation of the server for more details about how to provide the
+WSGI application to it.
+
+Instances of ``micropath.Controller`` also have a ``micropath_run()``
+utility method.  This method simply uses the Python standard library's
+built-in ``wsgiref`` package to launch a simple web server.  By
+default, this server will run on the loopback interface ("localhost",
+or, more technically, "127.0.0.1") on port 8000, although that can be
+controlled using arguments to the method.  Note that this is *NOT
+RECOMMENDED* for production systems; this simple server does not
+attempt to handle threading, exceptional error handling, SSL, or a
+host of other issues that real, production-ready HTTP and WSGI servers
+handle.  This is simply meant to simplify testing an application on a
+developer's local laptop.
+
+The HEAD HTTP Method
+====================
+
+The HTTP specification specifically states that the HEAD method should
+act identically to the GET method, except that no body is sent in the
+response.  Given that, the ``micropath`` framework treats HEAD as if
+it were GET.  In particular, a method that has HEAD routed to it will
+never be called unless GET is also routed to that method.
+Nevertheless, the ``method`` attribute of the request will contain the
+actual HTTP method that was sent.  This also means that the default
+OPTIONS response will include HEAD if GET is routed, without any
+additional effort on the part of the user.
+
+Controller Inheritance
+======================
+
+The element tree built for any given ``micropath.Controller`` subclass
+is unique to that specific class.  In particular, this means that a
+class that inherits from another class does *not* inherit the URL or
+method routing from that class, nor does it inherit the mount points.
+However, the hook methods and other customizing data elements are
+inherited, as are the actual handler methods and any other methods and
+data elements.  Users may take advantage of this by constructing a
+base controller class with the needed features, then basing the
+application controller classes on that base controller class.
