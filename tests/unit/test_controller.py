@@ -1272,7 +1272,7 @@ class TestController(object):
 
         obj.micropath_run()
 
-        mock_make_server.assert_called_once_with('', 8000, obj)
+        mock_make_server.assert_called_once_with('127.0.0.1', 8000, obj)
         server.serve_forever.assert_called_once_with()
 
     def test_micropath_run_alt(self, mocker):
@@ -1282,7 +1282,7 @@ class TestController(object):
         server = mock_make_server.return_value
         obj = controller.Controller()
 
-        obj.micropath_run('127.0.0.1', 5000)
+        obj.micropath_run('10.0.0.1', 5000)
 
-        mock_make_server.assert_called_once_with('127.0.0.1', 5000, obj)
+        mock_make_server.assert_called_once_with('10.0.0.1', 5000, obj)
         server.serve_forever.assert_called_once_with()

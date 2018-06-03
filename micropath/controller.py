@@ -722,7 +722,7 @@ class Controller(object):
 
         return webob.exc.HTTPNoContent(headers={'Allow': ','.join(methods)})
 
-    def micropath_run(self, host='', port=8000):
+    def micropath_run(self, host='127.0.0.1', port=8000):
         """
         Serve the application.  This makes use of the Python standard
         library ``wsgiref`` package's ``simple_server`` to present the
@@ -735,8 +735,8 @@ class Controller(object):
         handle.  This method is provided for testing purposes only.
 
         :param str host: The IP address for the server to listen on.
-                         Defaults to the empty string, meaning to
-                         listen on all interfaces.
+                         Defaults to "127.0.0.1", meaning to listen on
+                         the loopback interface (aka, "localhost".)
         :param int port: The port for the server to listen on.
                          Defaults to 8000.
         """
